@@ -1,98 +1,224 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# App Talen Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend construido con NestJS, TypeORM y PostgreSQL.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+El objetivo de esta base es dejar preparado el proyecto para trabajar con una arquitectura modular, separando la logica de negocio de la infraestructura y dejando la base de datos modelada con entidades TypeORM.
 
-## Description
+## Que se hizo
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Se organizo el backend dentro de `src/modules` usando modulos por dominio funcional:
 
-## Project setup
+- `auth`
+- `users`
+- `profiles`
+- `assessment`
+- `learning`
+- `skills`
+- `companies`
+- `marketplace`
 
-```bash
-$ pnpm install
+Cada modulo esta pensado con esta estructura:
+
+```txt
+module/
+  domain/
+  application/
+  infrastructure/
 ```
 
-## Compile and run the project
+La idea de cada capa es:
 
-```bash
-# development
-$ pnpm run start
+- `domain`: reglas del negocio, enums, tipos y modelos propios del dominio.
+- `application`: casos de uso, servicios de aplicacion y orquestacion.
+- `infrastructure`: adaptadores externos, persistencia, entidades TypeORM, repositories, controladores o integraciones.
 
-# watch mode
-$ pnpm run start:dev
+Por ahora se crearon principalmente las entidades de persistencia dentro de:
 
-# production mode
-$ pnpm run start:prod
+```txt
+src/modules/*/infrastructure/entities
 ```
 
-## Run tests
+## Modelo de datos
 
-```bash
-# unit tests
-$ pnpm run test
+Se migro el modelo inicial a entidades TypeORM:
 
-# e2e tests
-$ pnpm run test:e2e
+- `User`
+- `Profile`
+- `Assessment`
+- `LearningPath`
+- `LearningModule`
+- `UserModuleProgress`
+- `Skill`
+- `UserSkill`
+- `Company`
+- `JobOpportunity`
+- `CandidateApplication`
+- `CompanyFeedback`
 
-# test coverage
-$ pnpm run test:cov
+Tambien se agregaron los enums:
+
+- `UserRole`
+- `ModuleStatus`
+- `ApplicationStatus`
+
+Las relaciones principales son:
+
+- Un `User` puede tener un `Profile` o una `Company`.
+- Un `Profile` tiene assessments, rutas de aprendizaje, progreso, skills y postulaciones.
+- Una `Company` publica oportunidades laborales.
+- Una `JobOpportunity` recibe postulaciones de candidatos.
+- Una `CandidateApplication` puede tener feedback de empresa.
+- Los modulos de aprendizaje pueden estar relacionados con skills.
+
+## Configuracion de TypeORM
+
+La configuracion de TypeORM esta separada en:
+
+```txt
+src/config/typeorm.config.ts
 ```
 
-## Deployment
+El `AppModule` solo importa esa configuracion:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+```ts
+TypeOrmModule.forRoot(typeormConfig)
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+TypeORM esta configurado para PostgreSQL y toma valores desde variables de entorno:
 
-## Resources
+```env
+PORT=3000
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+DB_DATABASE=talent_db
+TYPEORM_SYNC=true
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+`TYPEORM_SYNC=true` permite que TypeORM cree o sincronice tablas automaticamente durante desarrollo. Para produccion se recomienda usar migraciones y dejarlo en `false`.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Docker
 
-## Support
+Se agregaron archivos para levantar el backend en contenedores:
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```txt
+Dockerfile
+docker-compose.yml
+.dockerignore
+.env.example
+```
 
-## Stay in touch
+El `Dockerfile` usa una estrategia multi-stage:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- Instala dependencias con `pnpm`.
+- Compila el proyecto NestJS.
+- Deja una imagen final solo con `dist`, `node_modules` de produccion y `package.json`.
 
-## License
+El `docker-compose.yml` levanta dos servicios:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- `api`: backend NestJS.
+- `postgres`: base de datos PostgreSQL.
+
+Dentro de Docker, la API usa `DB_HOST=postgres`, porque ese es el nombre del servicio de base de datos dentro de la red de Docker Compose.
+
+## Levantar con Docker
+
+Desde esta carpeta:
+
+```bash
+cd Backend/app-talen-backend
+```
+
+Levantar API y base de datos:
+
+```bash
+docker compose up --build
+```
+
+La API queda disponible en:
+
+```txt
+http://localhost:3000
+```
+
+PostgreSQL queda disponible en:
+
+```txt
+localhost:5432
+```
+
+Credenciales por defecto:
+
+```txt
+usuario: postgres
+password: postgres
+base de datos: talent_db
+```
+
+## Crear solo la imagen Docker
+
+```bash
+docker build -t app-talen-backend .
+```
+
+Ejecutar la imagen creada:
+
+```bash
+docker run --name app-talen-api -p 3000:3000 \
+  -e DB_HOST=host.docker.internal \
+  -e DB_PORT=5432 \
+  -e DB_USERNAME=postgres \
+  -e DB_PASSWORD=postgres \
+  -e DB_DATABASE=talent_db \
+  -e TYPEORM_SYNC=true \
+  app-talen-backend
+```
+
+Si se usa Linux y `host.docker.internal` no esta disponible, conviene usar `docker compose` o pasar la IP/host real de la base de datos.
+
+## Levantar sin Docker
+
+Instalar dependencias:
+
+```bash
+pnpm install
+```
+
+Crear un archivo `.env` tomando como referencia `.env.example`.
+
+Ejecutar en desarrollo:
+
+```bash
+pnpm run start:dev
+```
+
+Compilar:
+
+```bash
+pnpm run build
+```
+
+Ejecutar compilado:
+
+```bash
+pnpm run start:prod
+```
+
+## Comandos utiles
+
+```bash
+pnpm run build
+pnpm run start:dev
+pnpm run test
+pnpm run lint
+```
+
+## Siguientes pasos sugeridos
+
+- Crear modulos Nest reales para cada dominio.
+- Agregar controllers, services y casos de uso en `application`.
+- Crear repositories o providers de TypeORM en `infrastructure`.
+- Reemplazar `TYPEORM_SYNC=true` por migraciones TypeORM cuando el modelo se estabilice.
+- Agregar autenticacion JWT en `auth`.
+- Agregar DTOs y validaciones para los endpoints.
