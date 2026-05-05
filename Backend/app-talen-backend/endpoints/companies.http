@@ -1,0 +1,5 @@
+@baseUrl = http://localhost:3001
+@accessToken =
+
+### Companies endpoints
+# Agregar aca los requests del modulo companies cuando existan controllers.

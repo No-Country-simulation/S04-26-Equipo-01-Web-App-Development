@@ -1,0 +1,5 @@
+@baseUrl = http://localhost:3001
+@accessToken =
+
+### Learning endpoints
+# Agregar aca los requests del modulo learning cuando existan controllers.

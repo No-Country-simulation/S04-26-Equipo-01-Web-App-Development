@@ -1,0 +1,5 @@
+@baseUrl = http://localhost:3001
+@accessToken =
+
+### Assessment endpoints
+# Agregar aca los requests del modulo assessment cuando existan controllers.

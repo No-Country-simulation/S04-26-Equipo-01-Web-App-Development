@@ -1,0 +1,5 @@
+@baseUrl = http://localhost:3001
+@accessToken =
+
+### Skills endpoints
+# Agregar aca los requests del modulo skills cuando existan controllers.

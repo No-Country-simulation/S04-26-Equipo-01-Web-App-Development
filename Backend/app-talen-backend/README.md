@@ -88,15 +88,76 @@ TypeORM esta configurado para PostgreSQL y toma valores desde variables de entor
 
 ```env
 PORT=3000
+CORS_ORIGIN=*
 DB_HOST=localhost
 DB_PORT=5432
 DB_USERNAME=postgres
 DB_PASSWORD=postgres
 DB_DATABASE=talent_db
 TYPEORM_SYNC=true
+JWT_SECRET=change-this-secret
+JWT_EXPIRES_IN=7d
 ```
 
 `TYPEORM_SYNC=true` permite que TypeORM cree o sincronice tablas automaticamente durante desarrollo. Para produccion se recomienda usar migraciones y dejarlo en `false`.
+
+`JWT_EXPIRES_IN=7d` define que los tokens de autenticacion expiran a los 7 dias.
+
+## Autenticacion
+
+Se implementa autenticacion con JWT en el modulo `auth`.
+
+Registrar usuario:
+
+```bash
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"talent@example.com","password":"password123","role":"TALENT"}'
+```
+
+Roles aceptados:
+
+```txt
+TALENT
+COMPANY
+ADMIN
+```
+
+Si se envia otro valor en `role`, la API responde `400 Bad Request`.
+
+Login:
+
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"talent@example.com","password":"password123"}'
+```
+
+Respuesta esperada:
+
+```json
+{
+  "accessToken": "jwt-token",
+  "tokenType": "Bearer",
+  "expiresIn": "7d",
+  "user": {
+    "id": "user-id",
+    "email": "talent@example.com",
+    "role": "TALENT"
+  }
+}
+```
+
+El payload del JWT incluye:
+
+```json
+{
+  "userId": "user-id",
+  "role": "TALENT"
+}
+```
+
+Las contrasenas se guardan hasheadas con bcrypt. Los errores de login devuelven un mensaje generico para no revelar si el email existe o si fallo la contrasena.
 
 ## Docker
 
@@ -142,6 +203,12 @@ La API queda disponible en:
 http://localhost:3000
 ```
 
+La documentacion Swagger queda disponible en:
+
+```txt
+http://localhost:3000/docs
+```
+
 PostgreSQL queda disponible en:
 
 ```txt
@@ -172,6 +239,8 @@ docker run --name app-talen-api -p 3000:3000 \
   -e DB_PASSWORD=postgres \
   -e DB_DATABASE=talent_db \
   -e TYPEORM_SYNC=true \
+  -e JWT_SECRET=change-this-secret \
+  -e JWT_EXPIRES_IN=7d \
   app-talen-backend
 ```
 
@@ -213,12 +282,3 @@ pnpm run start:dev
 pnpm run test
 pnpm run lint
 ```
-
-## Siguientes pasos sugeridos
-
-- Crear modulos Nest reales para cada dominio.
-- Agregar controllers, services y casos de uso en `application`.
-- Crear repositories o providers de TypeORM en `infrastructure`.
-- Reemplazar `TYPEORM_SYNC=true` por migraciones TypeORM cuando el modelo se estabilice.
-- Agregar autenticacion JWT en `auth`.
-- Agregar DTOs y validaciones para los endpoints.

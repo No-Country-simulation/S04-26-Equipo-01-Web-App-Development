@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { typeormConfig } from './config/typeorm.config';
+import { DatabaseModule } from './config/database.module';
 import { AssessmentModule } from './modules/assessment/assessment.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
@@ -14,7 +14,8 @@ import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(typeormConfig),
+    ConfigModule.forRoot({ isGlobal: true }),
+    DatabaseModule,
     AuthModule,
     UsersModule,
     ProfilesModule,
