@@ -16,12 +16,16 @@ import { AuthController } from './infrastructure/auth.controller';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService): JwtModuleOptions => {
-        const expiresIn = configService.get<string>('JWT_EXPIRES_IN', '7d') as NonNullable<
-          JwtModuleOptions['signOptions']
-        >['expiresIn'];
+        const expiresIn = configService.get<string>(
+          'JWT_EXPIRES_IN',
+          '7d',
+        ) as NonNullable<JwtModuleOptions['signOptions']>['expiresIn'];
 
         return {
-          secret: configService.get<string>('JWT_SECRET', 'dev-secret-change-me'),
+          secret: configService.get<string>(
+            'JWT_SECRET',
+            'dev-secret-change-me',
+          ),
           signOptions: {
             expiresIn,
           },
