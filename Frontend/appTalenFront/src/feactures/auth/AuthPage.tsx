@@ -265,7 +265,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }
             disabled={isSubmitting}
             sx={{ bgcolor: '#DD6B20', color: '#fff', '&:hover': { bgcolor: '#C05621' }, mt: 1 }}
           >
-            {isSubmitting ? 'Procesando...' : tab === 0 ? 'Ingresar' : 'Registrar Cuenta'}
+            {isSubmitting ? 'Procesando...' : tab === 0 ? 'Ingresar' : 'Registrar'}
           </Button>
         </Box>
 
