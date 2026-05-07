@@ -1,5 +1,4 @@
 import {
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -30,7 +29,8 @@ export class ProfilesService {
     });
 
     if (existingProfile) {
-      throw new ConflictException('Profile already exists for this user');
+      this.profilesRepository.merge(existingProfile, createProfileDto);
+      return this.profilesRepository.save(existingProfile);
     }
 
     const profile = this.profilesRepository.create({
@@ -38,15 +38,7 @@ export class ProfilesService {
       userId: authUser.userId,
     });
 
-    try {
-      return await this.profilesRepository.save(profile);
-    } catch (error) {
-      if (this.isUniqueViolation(error)) {
-        throw new ConflictException('Profile already exists for this user');
-      }
-
-      throw error;
-    }
+    return this.profilesRepository.save(profile);
   }
 
   async getMe(authUser: AuthTokenPayload): Promise<Profile> {
