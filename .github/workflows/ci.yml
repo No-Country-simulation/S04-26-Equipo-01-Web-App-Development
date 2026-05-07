@@ -54,7 +54,7 @@ jobs:
 
       - name: Lint backend
         working-directory: Backend/app-talen-backend
-        run: pnpm run lint
+        run: pnpm exec eslint "{src,apps,libs,test}/**/*.ts"
 
       - name: Lint frontend
         working-directory: Frontend/appTalenFront
