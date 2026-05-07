@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-and-test:
+    name: Lint, test and build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: talent_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d talent_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install backend dependencies
+        working-directory: Backend/app-talen-backend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install frontend dependencies
+        working-directory: Frontend/appTalenFront
+        run: npm ci
+
+      - name: Lint backend
+        working-directory: Backend/app-talen-backend
+        run: pnpm run lint
+
+      - name: Lint frontend
+        working-directory: Frontend/appTalenFront
+        run: npm run lint
+
+      - name: Test backend
+        working-directory: Backend/app-talen-backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          DB_DATABASE: talent_db
+          TYPEORM_SYNC: "true"
+          JWT_SECRET: test-secret
+          JWT_EXPIRES_IN: 7d
+        run: pnpm run test:e2e
+
+      - name: Test frontend
+        working-directory: Frontend/appTalenFront
+        run: npm run test --if-present
+
+      - name: Build backend
+        working-directory: Backend/app-talen-backend
+        run: pnpm run build
+
+      - name: Build frontend
+        working-directory: Frontend/appTalenFront
+        run: npm run build
