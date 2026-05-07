@@ -1,0 +1,5 @@
+@baseUrl = http://localhost:3001
+@accessToken =
+
+### Users endpoints
+# Agregar aca los requests del modulo users cuando existan controllers.

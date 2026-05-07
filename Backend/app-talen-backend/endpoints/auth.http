@@ -1,0 +1,35 @@
+@baseUrl = http://localhost:3001
+@accessToken =
+
+### Register TALENT
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "talent@example.com",
+  "password": "password123",
+  "role": "TALENT"
+}
+
+### Register COMPANY
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "company@example.com",
+  "password": "password123",
+  "role": "COMPANY"
+}
+
+### Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "talent@example.com",
+  "password": "password123"
+}
+
+### Example protected request
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken}}

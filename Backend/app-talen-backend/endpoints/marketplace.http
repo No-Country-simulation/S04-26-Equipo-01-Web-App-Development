@@ -1,0 +1,5 @@
+@baseUrl = http://localhost:3001
+@accessToken =
+
+### Marketplace endpoints
+# Agregar aca los requests del modulo marketplace cuando existan controllers.
