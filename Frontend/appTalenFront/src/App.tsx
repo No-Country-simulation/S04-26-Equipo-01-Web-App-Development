@@ -1,60 +1,70 @@
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Box, CssBaseline } from '@mui/material';
+import { Navbar } from './layout/Navbar';
+import { Footer } from './layout/Footer';
+import { LandingPage } from './feactures/landing/LandingPage';
+import { AuthPage } from './feactures/auth/AuthPage.tsx';
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   [key: string]: unknown;
 }
-import { useState } from 'react';
-import { LandingPage } from './feactures/landing/LandingPage';
-import { AuthPage } from './feactures/auth/AuthPage.tsx';
-import { Navbar } from './layout/Navbar';
-import { Footer } from './layout/Footer';
-import { Box, CssBaseline } from '@mui/material';
 
-export default function App() {
-  const [view, setView] = useState('landing'); // Controla la vista 'landing' o 'auth'
+function AppContent() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   const handleGetStarted = () => {
-    setView('auth');
+    navigate('/register');
   };
 
-  const handleLoginClick = () => {
-    setView('auth');
-  };
-
-  const handleLoginSuccess = (user: AuthUser) => {
-    console.log('Autenticación exitosa:', user);
-    // Aquí redirigiremos al dashboard según el perfil del usuario logueado
-  };
-
-  const handleRegisterClick = () => {
-    setView('register');
-  };
-
-  const handleHomeClick = () => {
-    setView('landing');
+  const handleLoginSuccess = (userData: AuthUser) => {
+    console.log('Autenticación exitosa:', userData);
+    setUser(userData);
+    navigate('/dashboard');
   };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#F7FAFC' }}>
       <CssBaseline />
-      <Navbar onLoginClick={handleLoginClick} onRegisterClick={handleRegisterClick} onHomeClick={handleHomeClick} />
+      
+      {/* El Navbar ya no necesita funciones de estado, el Router maneja todo */}
+      <Navbar />
 
       <Box sx={{ flex: 1 }}>
-        {view === 'landing' && (
-          <LandingPage onGetStarted={handleGetStarted} />
-        )}
+        <Routes>
+          {/* Ruta Principal */}
+          <Route path="/" element={<LandingPage onGetStarted={handleGetStarted} />} />
 
-        {view === 'auth' && (
-          <AuthPage onLoginSuccess={handleLoginSuccess} tab={0} />
-        )}
+          {/* Rutas de Autenticación pasando el tab correspondiente */}
+          <Route 
+            path="/login" 
+            element={<AuthPage onLoginSuccess={handleLoginSuccess} tab={0} />} 
+          />
+          <Route 
+            path="/register" 
+            element={<AuthPage onLoginSuccess={handleLoginSuccess} tab={1} />} 
+          />
 
-        {view === 'register' && (
-          <AuthPage onLoginSuccess={handleLoginSuccess} tab={1} />
-        )}
+          {/* Ejemplo de ruta protegida o futura */}
+          <Route path="/dashboard" element={user ? <div>Dashboard Content</div> : <Navigate to="/login" />} />
+          
+          {/* Redirección por si escriben cualquier otra cosa */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
       </Box>
 
       <Footer />
     </Box>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   );
 }

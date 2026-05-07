@@ -18,7 +18,7 @@ export const LandingPage = ({ onGetStarted }) => {
   };
 
   return (
-    <Box sx={{ bgcolor: "#F7FAFC", minHeight: "80vh" }}>
+    <Box id="home" sx={{ bgcolor: "#F7FAFC", minHeight: "80vh" }}>
       {/* Hero Section */}
       <Box
         sx={{
@@ -115,7 +115,7 @@ export const LandingPage = ({ onGetStarted }) => {
         </Grid>
       </Container>
       {/* Sección de Empresas */}
-      <Box sx={{ bgcolor: '#fff', py: 8 }}>
+      <Box id="marketplace" sx={{ bgcolor: '#fff', py: 8 }}>
         <Container maxWidth="md" sx={{ textAlign: 'center' }}>
           <Typography variant="h4" gutterBottom sx={{ color: '#1A365D', fontWeight: 'bold', mb: 4 }}>
             Empresas Aliadas
