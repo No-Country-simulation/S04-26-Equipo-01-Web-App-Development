@@ -3,8 +3,9 @@ import type { FC } from 'react';
 import { Box, Container, Typography, TextField, Button, Paper, Tabs, Tab } from '@mui/material';
 import { Google, LinkedIn } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import type { AuthUser } from '../../App';
+import { loginUser, registerUser } from '../../services/auth.service';
+import { UserRole, type LoginDto, type RegisterDto } from '../../types/auth.types';
 
 interface AuthPageProps {
   onLoginSuccess: (user: AuthUser) => void;
@@ -77,7 +78,7 @@ const validateRegisterPassword = (password: string): string | undefined => {
 export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }) => {
   const navigate = useNavigate();
   const [internalTab, setInternalTab] = useState<number>(externalTab ?? 0); // 0 = Iniciar sesión, 1 = Registrarse
-  const [role, setRole] = useState('talento'); // 'talento' o 'empresa'
+  const [role, setRole] = useState<'talento' | 'empresa'>('talento');
   const [formData, setFormData] = useState({ email: '', password: '', name: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,7 +94,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }
     setInternalTab(newValue);
   };
 
-  const handleRoleChange = (newRole: string) => {
+  const handleRoleChange = (newRole: 'talento' | 'empresa') => {
     setRole(newRole);
   };
 
@@ -152,28 +153,41 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }
 
     setIsSubmitting(true);
     try {
-      const endpoint = tab === 0 ? '/api/auth/login' : '/api/auth/register';
-      const response = await axios.post(endpoint, {
-        ...formData,
-        email: formData.email.trim(),
-        role,
-      });
+      if (tab === 1) {
+        const payload: RegisterDto = {
+          email: formData.email.trim(),
+          password: formData.password,
+          role: role === 'talento' ? UserRole.TALENT : UserRole.COMPANY,
+        };
 
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        onLoginSuccess(response.data.user);
-        navigate('/dashboard');
+        await registerUser(payload);
+        navigate('/login');
       } else {
-        setErrors({ general: tab === 0 ? 'No fue posible iniciar sesión. Verifica tus credenciales.' : 'No se pudo completar el registro. Intenta nuevamente.' });
+        const payload: LoginDto = {
+          email: formData.email.trim(),
+          password: formData.password,
+        };
+        const response = await loginUser(payload);
+        const token = response.accessToken;
+
+        if (token && response.user) {
+          localStorage.setItem('token', token);
+          const authUser: AuthUser = {
+            id: response.user.id,
+            email: response.user.email,
+            name: response.user.name ?? response.user.email,
+            role: response.user.role,
+          };
+          localStorage.setItem('authUser', JSON.stringify(authUser));
+          onLoginSuccess(authUser);
+          navigate('/dashboard');
+        } else {
+          setErrors({ general: 'No fue posible iniciar sesión. Verifica tus credenciales.' });
+        }
       }
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        if (tab === 0) {
-          setErrors({ general: 'No fue posible iniciar sesión. Verifica tus credenciales.' });
-        } else {
-          const apiMessage = err.response?.data?.message;
-          setErrors({ general: apiMessage || 'No se pudo completar el registro. Revisa los datos e intenta nuevamente.' });
-        }
+      if (err instanceof Error) {
+        setErrors({ general: err.message });
       } else {
         setErrors({ general: 'Ocurrió un error inesperado. Intenta nuevamente.' });
       }

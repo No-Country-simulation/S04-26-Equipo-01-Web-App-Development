@@ -1,5 +1,5 @@
 import React from "react";
-import {  Box, Container, Typography, Button, Grid, Card, CardContent,} from "@mui/material";
+import { Box, Container, Typography, Button, Card, CardContent } from "@mui/material";
 import { School, Work } from "@mui/icons-material";
 
 export const LandingPage = ({ onGetStarted }) => {
@@ -38,7 +38,7 @@ export const LandingPage = ({ onGetStarted }) => {
           >
             Reinvención Profesional
           </Typography>
-          <Typography variant="h6" paragraph sx={{ color: "#fff", opacity: 0.95, mb: 4 }}>
+          <Typography component="p" variant="h6" sx={{ color: "#fff", opacity: 0.95, mb: 4 }}>
             Conectamos tu experiencia validada con las empresas. Capacítate,
             construye tu perfil dinámico y encuentra oportunidades reales.
           </Typography>
@@ -69,8 +69,8 @@ export const LandingPage = ({ onGetStarted }) => {
         >
           Nuestra Propuesta de Valor
         </Typography>
-        <Grid container spacing={4}>
-          <Grid item xs={12} md={12} sx={valueCardItemSx}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <Box sx={valueCardItemSx}>
             <Card sx={valueCardSx}>
               <CardContent sx={{ textAlign: "center", flexGrow: 1 }}>
                 <School sx={{ fontSize: 60, color: "#DD6B20", mb: 2 }} />
@@ -92,8 +92,8 @@ export const LandingPage = ({ onGetStarted }) => {
                 </Typography>
               </CardContent>
             </Card>
-          </Grid>
-          <Grid item xs={12} md={12} sx={valueCardItemSx}>
+          </Box>
+          <Box sx={valueCardItemSx}>
             <Card sx={valueCardSx}>
               <CardContent sx={{ textAlign: "center", flexGrow: 1 }}>
                 <Work sx={{ fontSize: 60, color: "#DD6B20", mb: 2 }} />
@@ -111,8 +111,8 @@ export const LandingPage = ({ onGetStarted }) => {
                 </Typography>
               </CardContent>
             </Card>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
       </Container>
       {/* Sección de Empresas */}
       <Box id="marketplace" sx={{ bgcolor: '#fff', py: 8 }}>
@@ -120,7 +120,7 @@ export const LandingPage = ({ onGetStarted }) => {
           <Typography variant="h4" gutterBottom sx={{ color: '#1A365D', fontWeight: 'bold', mb: 4 }}>
             Empresas Aliadas
           </Typography>
-          <Typography variant="body1" color="#2D3748" paragraph sx={{ maxWidth: '600px', mx: 'auto' }}>
+          <Typography component="p" variant="body1" color="#2D3748" sx={{ maxWidth: '600px', mx: 'auto' }}>
             Trabajamos con organizaciones e instituciones para revalorizar la experiencia profesional y promover la inclusión laboral senior.
           </Typography>
         </Container>
