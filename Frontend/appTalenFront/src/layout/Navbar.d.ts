@@ -1,1 +1,8 @@
-export declare const Navbar: React.FC<{ onLoginClick?: () => void; onRegisterClick?: () => void; onHomeClick?: () => void }>;
+import type * as React from 'react';
+
+export interface NavbarProps {
+	isAuthenticated?: boolean;
+	onLogout?: () => void;
+}
+
+export declare const Navbar: React.FC<NavbarProps>;

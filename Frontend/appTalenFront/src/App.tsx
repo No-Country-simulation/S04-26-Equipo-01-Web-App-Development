@@ -14,7 +14,22 @@ export interface AuthUser {
 
 function AppContent() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('authUser');
+
+    if (!token || !storedUser) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(storedUser) as AuthUser;
+    } catch {
+      localStorage.removeItem('authUser');
+      localStorage.removeItem('token');
+      return null;
+    }
+  });
 
   const handleGetStarted = () => {
     navigate('/register');
@@ -26,12 +41,19 @@ function AppContent() {
     navigate('/dashboard');
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('authUser');
+    setUser(null);
+    navigate('/login');
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#F7FAFC' }}>
       <CssBaseline />
       
       {/* El Navbar ya no necesita funciones de estado, el Router maneja todo */}
-      <Navbar />
+      <Navbar isAuthenticated={Boolean(user)} onLogout={handleLogout} />
 
       <Box sx={{ flex: 1 }}>
         <Routes>
@@ -41,11 +63,11 @@ function AppContent() {
           {/* Rutas de Autenticación pasando el tab correspondiente */}
           <Route 
             path="/login" 
-            element={<AuthPage onLoginSuccess={handleLoginSuccess} tab={0} />} 
+            element={user ? <Navigate to="/dashboard" /> : <AuthPage onLoginSuccess={handleLoginSuccess} tab={0} />} 
           />
           <Route 
             path="/register" 
-            element={<AuthPage onLoginSuccess={handleLoginSuccess} tab={1} />} 
+            element={user ? <Navigate to="/dashboard" /> : <AuthPage onLoginSuccess={handleLoginSuccess} tab={1} />} 
           />
 
           {/* Ejemplo de ruta protegida o futura */}
