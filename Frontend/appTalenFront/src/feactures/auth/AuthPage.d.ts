@@ -1,7 +1,3 @@
-import type { FC } from 'react';
-import type { AuthUser } from '../../App';
+import React from 'react';
 
-export declare const AuthPage: FC<{
-  onLoginSuccess: (user: AuthUser) => void;
-  tab?: number;
-}>;
+export declare const AuthPage: React.FC<{ onLoginSuccess: (user: any) => void }>;
