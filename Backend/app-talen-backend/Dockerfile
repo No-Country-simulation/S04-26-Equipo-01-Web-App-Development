@@ -7,7 +7,7 @@ RUN corepack enable
 
 FROM base AS deps
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
