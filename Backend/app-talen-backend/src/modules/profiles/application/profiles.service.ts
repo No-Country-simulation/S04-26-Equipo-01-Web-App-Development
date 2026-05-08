@@ -181,7 +181,7 @@ export class ProfilesService {
     return skillQuantityScore + levelScore;
   }
 
-  private getSkillLevelWeight(level: string): number {
+  private getSkillLevelWeight(level: SkillLevel): number {
     if (level === SkillLevel.ADVANCED) {
       return 1;
     }
