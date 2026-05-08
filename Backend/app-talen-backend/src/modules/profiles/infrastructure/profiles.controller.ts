@@ -39,4 +39,11 @@ export class ProfilesController {
   ): Promise<Profile> {
     return this.profilesService.updateMe(request.user, updateProfileDto);
   }
+
+  @Patch('me/employability-score')
+  recalculateMyEmployabilityScore(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<Profile> {
+    return this.profilesService.recalculateMyEmployabilityScore(request.user);
+  }
 }

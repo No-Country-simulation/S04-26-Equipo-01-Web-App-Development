@@ -29,3 +29,7 @@ Content-Type: application/json
   "headline": "Full Stack Developer Junior",
   "yearsExperience": 2
 }
+
+### Recalculate my employability score
+PATCH {{baseUrl}}/profiles/me/employability-score
+Authorization: Bearer {{accessToken}}

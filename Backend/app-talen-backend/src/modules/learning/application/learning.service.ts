@@ -82,7 +82,9 @@ export class LearningService {
     return this.findLearningPathById(learningPath.id);
   }
 
-  async findMyLearningPaths(authUser: AuthTokenPayload): Promise<LearningPath[]> {
+  async findMyLearningPaths(
+    authUser: AuthTokenPayload,
+  ): Promise<LearningPath[]> {
     const profile = await this.findTalentProfile(authUser);
 
     return this.learningPathsRepository.find({
@@ -151,17 +153,24 @@ export class LearningService {
     const nextStatus =
       updateModuleProgressDto.status ?? this.inferStatus(nextProgress);
 
-    progress.progress = nextStatus === ModuleStatus.COMPLETED ? 100 : nextProgress;
+    progress.progress =
+      nextStatus === ModuleStatus.COMPLETED ? 100 : nextProgress;
     progress.status = nextStatus;
     progress.completedAt =
-      nextStatus === ModuleStatus.COMPLETED ? (progress.completedAt ?? new Date()) : undefined;
+      nextStatus === ModuleStatus.COMPLETED
+        ? (progress.completedAt ?? new Date())
+        : undefined;
 
     return this.progressRepository.save(progress);
   }
 
-  private async findTalentProfile(authUser: AuthTokenPayload): Promise<Profile> {
+  private async findTalentProfile(
+    authUser: AuthTokenPayload,
+  ): Promise<Profile> {
     if (authUser.role !== UserRole.TALENT) {
-      throw new ForbiddenException('Only TALENT users can manage learning paths');
+      throw new ForbiddenException(
+        'Only TALENT users can manage learning paths',
+      );
     }
 
     const profile = await this.profilesRepository.findOne({
@@ -188,7 +197,9 @@ export class LearningService {
     return assessment;
   }
 
-  private async findLearningPathById(learningPathId: string): Promise<LearningPath> {
+  private async findLearningPathById(
+    learningPathId: string,
+  ): Promise<LearningPath> {
     const learningPath = await this.learningPathsRepository.findOne({
       where: { id: learningPathId },
       relations: {
@@ -231,7 +242,9 @@ export class LearningService {
     }
   }
 
-  private buildModulesFromAssessment(assessment: Assessment): GeneratedModule[] {
+  private buildModulesFromAssessment(
+    assessment: Assessment,
+  ): GeneratedModule[] {
     return [
       {
         title: `Fortalecimiento digital (${assessment.digitalLevel ?? 'basic'})`,
