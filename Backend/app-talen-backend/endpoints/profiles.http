@@ -1,5 +1,35 @@
 @baseUrl = http://localhost:3001
 @accessToken =
 
-### Profiles endpoints
-# Agregar aca los requests del modulo profiles cuando existan controllers.
+### Create my profile
+POST {{baseUrl}}/profiles/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fullName": "Juan Perez",
+  "ageRange": "25-34",
+  "location": "Buenos Aires",
+  "currentStatus": "buscando empleo",
+  "headline": "Frontend Developer Junior",
+  "professionalBio": "Estoy aprendiendo React y backend con NestJS",
+  "yearsExperience": 1
+}
+
+### Get my profile
+GET {{baseUrl}}/profiles/me
+Authorization: Bearer {{accessToken}}
+
+### Update my profile
+PATCH {{baseUrl}}/profiles/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "headline": "Full Stack Developer Junior",
+  "yearsExperience": 2
+}
+
+### Recalculate my employability score
+PATCH {{baseUrl}}/profiles/me/employability-score
+Authorization: Bearer {{accessToken}}

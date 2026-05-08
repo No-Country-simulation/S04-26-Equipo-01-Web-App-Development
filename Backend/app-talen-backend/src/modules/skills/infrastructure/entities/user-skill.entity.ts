@@ -6,6 +6,7 @@ import {
   Unique,
 } from 'typeorm';
 import { Profile } from '../../../profiles/infrastructure/entities/profile.entity';
+import { SkillLevel } from '../../domain/skill-level.enum';
 import { Skill } from './skill.entity';
 
 @Entity('user_skills')
@@ -20,8 +21,11 @@ export class UserSkill {
   @Column()
   skillId!: string;
 
-  @Column()
-  level!: string;
+  @Column({
+    type: 'enum',
+    enum: SkillLevel,
+  })
+  level!: SkillLevel;
 
   @Column({ nullable: true })
   evidence?: string;
