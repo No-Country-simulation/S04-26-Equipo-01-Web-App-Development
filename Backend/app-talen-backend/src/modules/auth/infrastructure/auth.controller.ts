@@ -30,12 +30,13 @@ export class AuthController {
 
   @Get('linkedin')
   @UseGuards(AuthGuard('linkedin'))
-  async linkedinAuth() {
-  }
+  linkedinAuth(): void {}
 
   @Get('linkedin/callback')
   @UseGuards(AuthGuard('linkedin'))
-  async linkedinAuthRedirect(@Req() req: any) {
+  // TODO: Evitar la asignación insegura con `any`.
+  // Crear un DTO o una interfaz para tipar correctamente el parámetro recibido.
+  linkedinAuthRedirect(@Req() req: any) {
     const userFromLinkedIn = req.user;
     return {
       message: 'Autenticación con LinkedIn exitosa',

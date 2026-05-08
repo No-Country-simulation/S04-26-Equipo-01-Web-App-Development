@@ -26,7 +26,8 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       scope: ['openid', 'profile', 'email'],
       state: true,
     } as any);
-
+    // TODO: Evitar la asignación insegura con `any`.
+    // Crear un DTO o una interfaz para tipar correctamente el parámetro recibido.
     (this as any).userProfile = async (accessToken: string, done: any) => {
       try {
         const response = await fetch('https://api.linkedin.com/v2/userinfo', {
@@ -37,17 +38,20 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
 
         if (!response.ok) {
           const errorData = await response.text();
-          return done(new Error(`Error de LinkedIn (${response.status}): ${errorData}`));
+          return done(
+            new Error(`Error de LinkedIn (${response.status}): ${errorData}`),
+          );
         }
-
+      // TODO: Evitar la asignación insegura con `any`.
+      // Crear un DTO o una interfaz para tipar correctamente el parámetro recibido.
         const json = await response.json();
-        
+
         const profile = {
           provider: 'linkedin',
           id: json.sub,
-          _json: json, 
+          _json: json,
         };
-        
+
         done(null, profile);
       } catch (error) {
         done(error);

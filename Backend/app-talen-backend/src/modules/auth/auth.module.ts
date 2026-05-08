@@ -38,10 +38,6 @@ import { LinkedInStrategy } from './infrastructure/strategies/linkedin.strategy'
     }),
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService, 
-    JwtAuthGuard, 
-    LinkedInStrategy,
-  ],
+  providers: [AuthService, JwtAuthGuard, LinkedInStrategy],
 })
 export class AuthModule {}
