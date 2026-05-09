@@ -22,17 +22,11 @@ interface LinkedInUserInfoResponse {
 export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
   constructor(private configService: ConfigService) {
     super({
-      authorizationURL: configService.get<string>(
-        'https://www.linkedin.com/oauth/v2/authorization',
-      )!,
-      tokenURL: configService.get<string>(
-        'https://www.linkedin.com/oauth/v2/accessToken',
-      )!,
+      authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
+      tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
       clientID: configService.get<string>('LINKEDIN_CLIENT_ID')!,
       clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET')!,
-      callbackURL: configService.get<string>(
-        'http://localhost:3000/auth/linkedin/callback',
-      )!,
+      callbackURL: 'http://localhost:3000/auth/linkedin/callback',
       scope: ['openid', 'profile', 'email'],
     });
   }
@@ -48,14 +42,11 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     ) => void,
   ): Promise<ValidatedLinkedInUser> {
     try {
-      const response = await fetch(
-        this.configService.get<string>('https://api.linkedin.com/v2/userinfo')!,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+      const response = await fetch('https://api.linkedin.com/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
         },
-      );
+      });
 
       if (!response.ok) {
         throw new Error('Failed to fetch user profile from LinkedIn');
