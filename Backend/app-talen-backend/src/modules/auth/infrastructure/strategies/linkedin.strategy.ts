@@ -25,10 +25,14 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       authorizationURL: configService.get<string>(
         'https://www.linkedin.com/oauth/v2/authorization',
       )!,
-      tokenURL: configService.get<string>('https://www.linkedin.com/oauth/v2/accessToken')!,
+      tokenURL: configService.get<string>(
+        'https://www.linkedin.com/oauth/v2/accessToken',
+      )!,
       clientID: configService.get<string>('LINKEDIN_CLIENT_ID')!,
       clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET')!,
-      callbackURL: configService.get<string>('http://localhost:3000/auth/linkedin/callback')!,
+      callbackURL: configService.get<string>(
+        'http://localhost:3000/auth/linkedin/callback',
+      )!,
       scope: ['openid', 'profile', 'email'],
     });
   }
