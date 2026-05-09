@@ -39,5 +39,6 @@ import { LinkedInStrategy } from './infrastructure/strategies/linkedin.strategy'
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtAuthGuard, LinkedInStrategy],
+  exports: [JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}
