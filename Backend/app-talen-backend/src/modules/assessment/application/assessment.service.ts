@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AiAssessmentService } from '../../ai/application/ai-assessment.service';
 import { AuthTokenPayload } from '../../auth/domain/auth-token-payload.type';
 import { Profile } from '../../profiles/infrastructure/entities/profile.entity';
 import { UserRole } from '../../users/domain/user-role.enum';
@@ -18,6 +19,7 @@ export class AssessmentService {
     private readonly assessmentsRepository: Repository<Assessment>,
     @InjectRepository(Profile)
     private readonly profilesRepository: Repository<Profile>,
+    private readonly aiAssessmentService: AiAssessmentService,
   ) {}
 
   async createMe(
@@ -25,9 +27,15 @@ export class AssessmentService {
     createAssessmentDto: CreateAssessmentDto,
   ): Promise<Assessment> {
     const profile = await this.findTalentProfile(authUser);
+    const aiAnalysis = await this.aiAssessmentService.analyzeAssessment(
+      profile,
+      createAssessmentDto,
+    );
     const assessment = this.assessmentsRepository.create({
       ...createAssessmentDto,
       profileId: profile.id,
+      aiSummary: aiAnalysis?.summary,
+      detectedGaps: aiAnalysis?.detectedGaps,
     });
 
     return this.assessmentsRepository.save(assessment);

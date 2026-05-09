@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Assessment } from '../assessment/infrastructure/entities/assessment.entity';
 import { AuthModule } from '../auth/auth.module';
 import { Profile } from '../profiles/infrastructure/entities/profile.entity';
+import { Skill } from '../skills/infrastructure/entities/skill.entity';
+import { UserSkill } from '../skills/infrastructure/entities/user-skill.entity';
 import { LearningService } from './application/learning.service';
 import { LearningController } from './infrastructure/learning.controller';
 import { LearningModule as LearningModuleEntity } from './infrastructure/entities/learning-module.entity';
@@ -18,6 +20,8 @@ import { UserModuleProgress } from './infrastructure/entities/user-module-progre
       UserModuleProgress,
       Profile,
       Assessment,
+      Skill,
+      UserSkill,
     ]),
   ],
   controllers: [LearningController],
