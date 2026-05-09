@@ -23,12 +23,12 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
   constructor(private configService: ConfigService) {
     super({
       authorizationURL: configService.get<string>(
-        'LINKEDIN_AUTHORIZATION_URL',
+        'https://www.linkedin.com/oauth/v2/authorization',
       )!,
-      tokenURL: configService.get<string>('LINKEDIN_TOKEN_URL')!,
+      tokenURL: configService.get<string>('https://www.linkedin.com/oauth/v2/accessToken')!,
       clientID: configService.get<string>('LINKEDIN_CLIENT_ID')!,
       clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET')!,
-      callbackURL: configService.get<string>('LINKEDIN_CALLBACK_URL')!,
+      callbackURL: configService.get<string>('http://localhost:3000/auth/linkedin/callback')!,
       scope: ['openid', 'profile', 'email'],
     });
   }
@@ -45,7 +45,7 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
   ): Promise<ValidatedLinkedInUser> {
     try {
       const response = await fetch(
-        this.configService.get<string>('LINKEDIN_USERINFO_URL')!,
+        this.configService.get<string>('https://api.linkedin.com/v2/userinfo')!,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
