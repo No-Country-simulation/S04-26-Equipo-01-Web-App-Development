@@ -15,7 +15,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuthResponse } from './types/auth-response.type';
 import { ValidatedLinkedInUser } from '../infrastructure/strategies/linkedin.strategy';
-import { UserRole } from 'src/modules/users/domain/user-role.enum';
+import { UserRole } from '../../users/domain/user-role.enum';
 
 @Injectable()
 export class AuthService {
