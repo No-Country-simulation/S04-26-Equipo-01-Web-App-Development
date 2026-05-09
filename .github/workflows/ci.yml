@@ -63,6 +63,8 @@ jobs:
       - name: Test backend
         working-directory: Backend/app-talen-backend
         env:
+          LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
+          LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
           DB_HOST: localhost
           DB_PORT: 5434
           DB_USERNAME: postgres
