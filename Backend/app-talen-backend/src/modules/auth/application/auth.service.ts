@@ -14,6 +14,8 @@ import { AuthTokenPayload } from '../domain/auth-token-payload.type';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuthResponse } from './types/auth-response.type';
+import { ValidatedLinkedInUser } from '../infrastructure/strategies/linkedin.strategy';
+import { UserRole } from '../../users/domain/user-role.enum';
 
 @Injectable()
 export class AuthService {
@@ -73,6 +75,24 @@ export class AuthService {
 
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return this.buildAuthResponse(user);
+  }
+
+  async loginWithLinkedIn(
+    profile: ValidatedLinkedInUser,
+  ): Promise<AuthResponse> {
+    const email = this.normalizeEmail(profile.email);
+    let user = await this.usersRepository.findOne({ where: { email } });
+
+    if (!user) {
+      user = this.usersRepository.create({
+        email,
+        password: 'no_password_needed', // TODO: veirificar si es necesario un password o se puede dejar nulo
+        role: UserRole.TALENT,
+      });
+      user = await this.usersRepository.save(user);
     }
 
     return this.buildAuthResponse(user);
