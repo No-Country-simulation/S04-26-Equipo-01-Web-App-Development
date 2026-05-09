@@ -7,6 +7,15 @@ import { AuthResponse } from '../application/types/auth-response.type';
 import type { AuthenticatedUser } from '../domain/authenticated-user.type';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from './types/authenticated-request.type';
+import type { ValidatedLinkedInUser } from './strategies/linkedin.strategy';
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+
+export const GetUser = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    return request.user;
+  },
+);
 
 @Controller('auth')
 export class AuthController {
@@ -30,17 +39,12 @@ export class AuthController {
 
   @Get('linkedin')
   @UseGuards(AuthGuard('linkedin'))
-  linkedinAuth(): void {}
+  linkedinAuth(): void {
+  }
 
   @Get('linkedin/callback')
   @UseGuards(AuthGuard('linkedin'))
-  // TODO: Evitar la asignación insegura con `any`.
-  // Crear un DTO o una interfaz para tipar correctamente el parámetro recibido.
-  linkedinAuthRedirect(@Req() req: any) {
-    const userFromLinkedIn = req.user;
-    return {
-      message: 'Autenticación con LinkedIn exitosa',
-      data: userFromLinkedIn,
-    };
+  async linkedinAuthRedirect(@GetUser() user: ValidatedLinkedInUser) {
+    return this.authService.loginWithLinkedIn(user);
   }
 }

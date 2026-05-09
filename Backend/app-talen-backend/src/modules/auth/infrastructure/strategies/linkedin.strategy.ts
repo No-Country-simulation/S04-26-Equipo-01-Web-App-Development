@@ -1,80 +1,58 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import { Strategy } from 'passport-oauth2';
 import { ConfigService } from '@nestjs/config';
-import { Strategy } from 'passport-linkedin-oauth2';
-import { VerifyCallback } from 'passport-oauth2';
-import { Profile } from 'passport';
 
-export interface LinkedInProfile extends Profile {
-  _json: {
-    given_name: string;
-    family_name: string;
-    email: string;
-    picture: string;
-    sub: string;
-    [key: string]: unknown;
-  };
+export interface ValidatedLinkedInUser {
+  email: string;
+  firstName: string;
+  providerId: string;
+  accessToken: string;
 }
 
 @Injectable()
 export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
-  constructor(private readonly configService: ConfigService) {
+  constructor(private configService: ConfigService) {
     super({
+      authorizationURL: configService.get<string>('LINKEDIN_AUTHORIZATION_URL')!,
+      tokenURL: configService.get<string>('LINKEDIN_TOKEN_URL')!,
       clientID: configService.get<string>('LINKEDIN_CLIENT_ID')!,
       clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET')!,
       callbackURL: configService.get<string>('LINKEDIN_CALLBACK_URL')!,
       scope: ['openid', 'profile', 'email'],
-      state: true,
-    } as any);
-    // TODO: Evitar la asignación insegura con `any`.
-    // Crear un DTO o una interfaz para tipar correctamente el parámetro recibido.
-    (this as any).userProfile = async (accessToken: string, done: any) => {
-      try {
-        const response = await fetch('https://api.linkedin.com/v2/userinfo', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.text();
-          return done(
-            new Error(`Error de LinkedIn (${response.status}): ${errorData}`),
-          );
-        }
-      // TODO: Evitar la asignación insegura con `any`.
-      // Crear un DTO o una interfaz para tipar correctamente el parámetro recibido.
-        const json = await response.json();
-
-        const profile = {
-          provider: 'linkedin',
-          id: json.sub,
-          _json: json,
-        };
-
-        done(null, profile);
-      } catch (error) {
-        done(error);
-      }
-    };
+    });
   }
 
-  validate(
-    accessToken: string,
-    refreshToken: string,
-    profile: LinkedInProfile,
-    done: VerifyCallback,
-  ) {
-    const { given_name, family_name, email, picture } = profile._json;
+  async validate(
+    accessToken: string, 
+    refreshToken: string, 
+    profile: any, 
+    done: (err: Error | null, user: ValidatedLinkedInUser | false, info?: unknown) => void,): Promise<ValidatedLinkedInUser> {
+    try {
+      const response = await fetch(this.configService.get<string>('LINKEDIN_USERINFO_URL')!, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        },
+      });
 
-    const user = {
-      email,
-      firstName: given_name,
-      lastName: family_name,
-      picture,
-      accessToken,
-    };
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile from LinkedIn');
+      }
 
-    done(null, user);
+      const data = await response.json();
+
+      const user: ValidatedLinkedInUser = {
+        email: data.email,
+        firstName: data.given_name,
+        providerId: data.sub,
+        accessToken,
+      };
+
+      done(null, user);
+      return user;
+    } catch (error) {
+      done(error as Error, false);
+      throw error;
+    }
   }
 }
