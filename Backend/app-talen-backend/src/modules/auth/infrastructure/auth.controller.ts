@@ -9,10 +9,13 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from './types/authenticated-request.type';
 import type { ValidatedLinkedInUser } from './strategies/linkedin.strategy';
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { Request } from 'express';
 
 export const GetUser = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext) => {
-    const request = ctx.switchToHttp().getRequest();
+  (data: unknown, ctx: ExecutionContext): ValidatedLinkedInUser => {
+    const request = ctx
+      .switchToHttp()
+      .getRequest<Request & { user: ValidatedLinkedInUser }>();
     return request.user;
   },
 );
@@ -39,8 +42,7 @@ export class AuthController {
 
   @Get('linkedin')
   @UseGuards(AuthGuard('linkedin'))
-  linkedinAuth(): void {
-  }
+  linkedinAuth(): void {}
 
   @Get('linkedin/callback')
   @UseGuards(AuthGuard('linkedin'))

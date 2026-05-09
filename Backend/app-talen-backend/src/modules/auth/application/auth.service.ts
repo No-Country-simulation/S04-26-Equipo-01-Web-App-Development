@@ -80,14 +80,16 @@ export class AuthService {
     return this.buildAuthResponse(user);
   }
 
-  async loginWithLinkedIn(profile: ValidatedLinkedInUser): Promise<AuthResponse> {
+  async loginWithLinkedIn(
+    profile: ValidatedLinkedInUser,
+  ): Promise<AuthResponse> {
     const email = this.normalizeEmail(profile.email);
     let user = await this.usersRepository.findOne({ where: { email } });
 
     if (!user) {
       user = this.usersRepository.create({
         email,
-        password: "null", // TODO: veirificar si es necesario un password o se puede dejar nulo
+        password: 'no_password_needed', // TODO: veirificar si es necesario un password o se puede dejar nulo
         role: UserRole.TALENT,
       });
       user = await this.usersRepository.save(user);
