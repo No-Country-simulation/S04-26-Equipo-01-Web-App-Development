@@ -11,12 +11,21 @@ export type AiSuggestedSkill = {
   level: 'INITIAL' | 'MEDIUM' | 'ADVANCED';
 };
 
+export type AiAlternativeTrack = {
+  name: string;
+  confidence: number;
+};
+
 export type AiAssessmentAnalysis = {
   summary: string;
   detectedGaps: {
     gaps: string[];
     recommendedFocus: string[];
     riskFactors: string[];
+    recommendedTrack: string;
+    confidence: number;
+    matchingReason: string;
+    alternativeTracks: AiAlternativeTrack[];
     recommendedModules: AiSuggestedModule[];
     suggestedSkills: AiSuggestedSkill[];
   };

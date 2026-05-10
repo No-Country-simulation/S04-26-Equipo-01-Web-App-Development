@@ -34,6 +34,13 @@ type GeneratedModule = {
   suggestedSkills: AiSuggestedSkill[];
 };
 
+type LearningPathMatching = {
+  recommendedTrack: string;
+  confidence: number;
+  matchingReason: string;
+  alternativeTracks: Record<string, unknown>[];
+};
+
 @Injectable()
 export class LearningService {
   constructor(
@@ -60,17 +67,22 @@ export class LearningService {
     const profile = await this.findTalentProfile(authUser);
     const assessment = await this.findLatestAssessment(profile.id);
     const generatedModules = this.buildModulesFromAssessment(assessment);
+    const matching = this.buildMatchingFromAssessment(assessment);
     const learningPath = await this.learningPathsRepository.save(
       this.learningPathsRepository.create({
         profileId: profile.id,
         title:
           generateLearningPathDto.title ??
-          `Ruta de aprendizaje para ${assessment.careerGoal ?? 'empleabilidad'}`,
+          `Ruta de aprendizaje para ${matching.recommendedTrack}`,
         objective:
           generateLearningPathDto.objective ??
           assessment.careerGoal ??
           'Fortalecer habilidades clave para mejorar la empleabilidad.',
         aiGenerated: true,
+        recommendedTrack: matching.recommendedTrack,
+        confidence: matching.confidence,
+        matchingReason: matching.matchingReason,
+        alternativeTracks: matching.alternativeTracks,
       }),
     );
     const modules = await Promise.all(
@@ -316,6 +328,31 @@ export class LearningService {
     ];
   }
 
+  private buildMatchingFromAssessment(
+    assessment: Assessment,
+  ): LearningPathMatching {
+    const detectedGaps = assessment.detectedGaps;
+
+    if (this.isAiDetectedGaps(detectedGaps)) {
+      return {
+        recommendedTrack: detectedGaps.recommendedTrack,
+        confidence: Math.round(detectedGaps.confidence),
+        matchingReason: detectedGaps.matchingReason,
+        alternativeTracks: detectedGaps.alternativeTracks,
+      };
+    }
+
+    const fallbackTrack = assessment.careerGoal ?? 'Empleabilidad digital';
+
+    return {
+      recommendedTrack: fallbackTrack,
+      confidence: 60,
+      matchingReason:
+        'Ruta generada con diagnostico base porque no hay matching de IA disponible.',
+      alternativeTracks: [],
+    };
+  }
+
   private buildModulesFromAiDetectedGaps(
     assessment: Assessment,
   ): GeneratedModule[] {
@@ -356,7 +393,12 @@ export class LearningService {
         this.isAiSuggestedModule(module),
       ) &&
       Array.isArray(value.suggestedSkills) &&
-      value.suggestedSkills.every((skill) => this.isAiSuggestedSkill(skill))
+      value.suggestedSkills.every((skill) => this.isAiSuggestedSkill(skill)) &&
+      typeof value.recommendedTrack === 'string' &&
+      typeof value.confidence === 'number' &&
+      typeof value.matchingReason === 'string' &&
+      Array.isArray(value.alternativeTracks) &&
+      value.alternativeTracks.every((track) => this.isAiAlternativeTrack(track))
     );
   }
 
@@ -392,6 +434,18 @@ export class LearningService {
       typeof value.name === 'string' &&
       typeof value.category === 'string' &&
       this.isSkillLevel(value.level)
+    );
+  }
+
+  private isAiAlternativeTrack(
+    value: unknown,
+  ): value is Record<string, unknown> {
+    if (!this.isRecord(value)) {
+      return false;
+    }
+
+    return (
+      typeof value.name === 'string' && typeof value.confidence === 'number'
     );
   }
 

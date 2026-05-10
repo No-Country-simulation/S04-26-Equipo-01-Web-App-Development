@@ -12,6 +12,7 @@ import { User } from '../../../users/infrastructure/entities/user.entity';
 import { LearningPath } from '../../../learning/infrastructure/entities/learning-path.entity';
 import { UserModuleProgress } from '../../../learning/infrastructure/entities/user-module-progress.entity';
 import { UserSkill } from '../../../skills/infrastructure/entities/user-skill.entity';
+import { WorkModality } from '../../domain/work-modality.enum';
 
 @Entity('profiles')
 export class Profile {
@@ -29,6 +30,16 @@ export class Profile {
 
   @Column({ nullable: true })
   location?: string;
+
+  @Column({ nullable: true })
+  country?: string;
+
+  @Column({
+    type: 'enum',
+    enum: WorkModality,
+    nullable: true,
+  })
+  preferredModality?: WorkModality;
 
   @Column({ nullable: true })
   currentStatus?: string;

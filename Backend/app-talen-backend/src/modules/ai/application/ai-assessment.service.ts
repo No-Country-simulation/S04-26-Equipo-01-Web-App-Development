@@ -88,6 +88,10 @@ export class AiAssessmentService {
       this.isStringArray(value.detectedGaps.gaps) &&
       this.isStringArray(value.detectedGaps.recommendedFocus) &&
       this.isStringArray(value.detectedGaps.riskFactors) &&
+      typeof value.detectedGaps.recommendedTrack === 'string' &&
+      typeof value.detectedGaps.confidence === 'number' &&
+      typeof value.detectedGaps.matchingReason === 'string' &&
+      Array.isArray(value.detectedGaps.alternativeTracks) &&
       Array.isArray(value.detectedGaps.recommendedModules) &&
       Array.isArray(value.detectedGaps.suggestedSkills)
     );
@@ -128,6 +132,10 @@ export class AiAssessmentService {
             'gaps',
             'recommendedFocus',
             'riskFactors',
+            'recommendedTrack',
+            'confidence',
+            'matchingReason',
+            'alternativeTracks',
             'recommendedModules',
             'suggestedSkills',
           ],
@@ -143,6 +151,32 @@ export class AiAssessmentService {
             riskFactors: {
               type: 'array',
               items: { type: 'string' },
+            },
+            recommendedTrack: {
+              type: 'string',
+              description:
+                'Rubro o ruta laboral recomendada, por ejemplo Backend Developer, QA Tester o Soporte IT.',
+            },
+            confidence: {
+              type: 'number',
+              description: 'Confianza de la recomendacion entre 0 y 100.',
+            },
+            matchingReason: {
+              type: 'string',
+              description:
+                'Motivo breve por el cual esta ruta laboral matchea con el perfil.',
+            },
+            alternativeTracks: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['name', 'confidence'],
+                properties: {
+                  name: { type: 'string' },
+                  confidence: { type: 'number' },
+                },
+              },
             },
             recommendedModules: {
               type: 'array',

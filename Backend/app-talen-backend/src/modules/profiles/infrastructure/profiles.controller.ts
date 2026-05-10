@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../../auth/infrastructure/types/authenticated-request.type';
 import { CreateProfileDto } from '../application/dto/create-profile.dto';
 import { UpdateProfileDto } from '../application/dto/update-profile.dto';
+import { UpdateWorkPreferencesDto } from '../application/dto/update-work-preferences.dto';
 import { ProfilesService } from '../application/profiles.service';
 import { Profile } from './entities/profile.entity';
 
@@ -38,6 +39,17 @@ export class ProfilesController {
     @Body() updateProfileDto: UpdateProfileDto,
   ): Promise<Profile> {
     return this.profilesService.updateMe(request.user, updateProfileDto);
+  }
+
+  @Patch('me/preferences')
+  updateMyWorkPreferences(
+    @Req() request: AuthenticatedRequest,
+    @Body() updateWorkPreferencesDto: UpdateWorkPreferencesDto,
+  ): Promise<Profile> {
+    return this.profilesService.updateMyWorkPreferences(
+      request.user,
+      updateWorkPreferencesDto,
+    );
   }
 
   @Patch('me/employability-score')
