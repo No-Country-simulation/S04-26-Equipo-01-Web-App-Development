@@ -5,6 +5,10 @@ import { Navbar } from './layout/Navbar';
 import { Footer } from './layout/Footer';
 import { LandingPage } from './feactures/landing/LandingPage';
 import { AuthPage } from './feactures/auth/AuthPage.tsx';
+import { TalentDashboard } from './feactures/profile/TalentDashboard';
+import { CompanyDashboard } from './feactures/marketplace/CompanyDashboard';
+import { AdminDashboard } from './feactures/admin/AdminDashboard';
+
 export interface AuthUser {
   id: string;
   name: string;
