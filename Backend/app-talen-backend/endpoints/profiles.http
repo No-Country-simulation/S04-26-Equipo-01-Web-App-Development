@@ -30,6 +30,29 @@ Content-Type: application/json
   "yearsExperience": 2
 }
 
+### Update my work preferences
+PATCH {{baseUrl}}/profiles/me/preferences
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "country": "Argentina",
+  "preferredModality": "HIBRIDO"
+}
+
+### Update my interested roles
+PATCH {{baseUrl}}/profiles/me/interested-roles
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "interestedRoles": [
+    "BACKEND_DEVELOPER",
+    "QA_TESTER",
+    "DATA_ANALYST"
+  ]
+}
+
 ### Recalculate my employability score
 PATCH {{baseUrl}}/profiles/me/employability-score
 Authorization: Bearer {{accessToken}}

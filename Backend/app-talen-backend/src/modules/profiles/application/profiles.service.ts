@@ -12,7 +12,9 @@ import { SkillLevel } from '../../skills/domain/skill-level.enum';
 import { UserSkill } from '../../skills/infrastructure/entities/user-skill.entity';
 import { UserRole } from '../../users/domain/user-role.enum';
 import { CreateProfileDto } from './dto/create-profile.dto';
+import { UpdateInterestedRolesDto } from './dto/update-interested-roles.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateWorkPreferencesDto } from './dto/update-work-preferences.dto';
 import { Profile } from '../infrastructure/entities/profile.entity';
 
 @Injectable()
@@ -65,6 +67,30 @@ export class ProfilesService {
 
     const profile = await this.findMyProfile(authUser.userId);
     this.profilesRepository.merge(profile, updateProfileDto);
+
+    return this.profilesRepository.save(profile);
+  }
+
+  async updateMyWorkPreferences(
+    authUser: AuthTokenPayload,
+    updateWorkPreferencesDto: UpdateWorkPreferencesDto,
+  ): Promise<Profile> {
+    this.ensureTalent(authUser);
+
+    const profile = await this.findMyProfile(authUser.userId);
+    this.profilesRepository.merge(profile, updateWorkPreferencesDto);
+
+    return this.profilesRepository.save(profile);
+  }
+
+  async updateMyInterestedRoles(
+    authUser: AuthTokenPayload,
+    updateInterestedRolesDto: UpdateInterestedRolesDto,
+  ): Promise<Profile> {
+    this.ensureTalent(authUser);
+
+    const profile = await this.findMyProfile(authUser.userId);
+    profile.interestedRoles = updateInterestedRolesDto.interestedRoles;
 
     return this.profilesRepository.save(profile);
   }
@@ -137,6 +163,9 @@ export class ProfilesService {
     const fields = [
       profile.fullName,
       profile.location,
+      profile.country,
+      profile.preferredModality,
+      this.hasInterestedRoles(profile) ? profile.interestedRoles : undefined,
       profile.currentStatus,
       profile.headline,
       profile.professionalBio,
@@ -147,6 +176,13 @@ export class ProfilesService {
     ).length;
 
     return completedFields / fields.length;
+  }
+
+  private hasInterestedRoles(profile: Profile): boolean {
+    return (
+      Array.isArray(profile.interestedRoles) &&
+      profile.interestedRoles.length > 0
+    );
   }
 
   private calculateAverageProgress(
