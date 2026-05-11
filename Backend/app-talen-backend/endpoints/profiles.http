@@ -40,6 +40,19 @@ Content-Type: application/json
   "preferredModality": "HIBRIDO"
 }
 
+### Update my interested roles
+PATCH {{baseUrl}}/profiles/me/interested-roles
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "interestedRoles": [
+    "BACKEND_DEVELOPER",
+    "QA_TESTER",
+    "DATA_ANALYST"
+  ]
+}
+
 ### Recalculate my employability score
 PATCH {{baseUrl}}/profiles/me/employability-score
 Authorization: Bearer {{accessToken}}

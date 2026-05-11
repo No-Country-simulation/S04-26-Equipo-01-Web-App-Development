@@ -10,6 +10,7 @@ import {
 import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../../auth/infrastructure/types/authenticated-request.type';
 import { CreateProfileDto } from '../application/dto/create-profile.dto';
+import { UpdateInterestedRolesDto } from '../application/dto/update-interested-roles.dto';
 import { UpdateProfileDto } from '../application/dto/update-profile.dto';
 import { UpdateWorkPreferencesDto } from '../application/dto/update-work-preferences.dto';
 import { ProfilesService } from '../application/profiles.service';
@@ -49,6 +50,17 @@ export class ProfilesController {
     return this.profilesService.updateMyWorkPreferences(
       request.user,
       updateWorkPreferencesDto,
+    );
+  }
+
+  @Patch('me/interested-roles')
+  updateMyInterestedRoles(
+    @Req() request: AuthenticatedRequest,
+    @Body() updateInterestedRolesDto: UpdateInterestedRolesDto,
+  ): Promise<Profile> {
+    return this.profilesService.updateMyInterestedRoles(
+      request.user,
+      updateInterestedRolesDto,
     );
   }
 
