@@ -9,6 +9,7 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  role: 'TALENT' | 'COMPANY' | 'ADMIN';
   [key: string]: unknown;
 }
 
@@ -70,8 +71,18 @@ function AppContent() {
             element={user ? <Navigate to="/dashboard" /> : <AuthPage onLoginSuccess={handleLoginSuccess} tab={1} />} 
           />
 
-          {/* Ejemplo de ruta protegida o futura */}
-          <Route path="/dashboard" element={user ? <div>Dashboard Content</div> : <Navigate to="/login" />} />
+          <Route path="/dashboard" element={
+    user ? (
+      user.role === 'TALENT' ? <TalentDashboard user={user} /> :
+      user.role === 'COMPANY' ? <CompanyDashboard user={user} /> :
+      user.role === 'ADMIN' ? <AdminDashboard user={user} /> :
+      <Navigate to="/" />
+    ) : (
+      <Navigate to="/login" />
+    )
+  } />
+
+  <Route path="/academia" element={user ? <AcademyPro /> : <Navigate to="/login" />} />
           
           {/* Redirección por si escriben cualquier otra cosa */}
           <Route path="*" element={<Navigate to="/" />} />
