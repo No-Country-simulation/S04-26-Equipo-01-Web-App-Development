@@ -9,6 +9,7 @@ import { AuthService } from './application/auth.service';
 import { JwtAuthGuard } from './infrastructure/guards/jwt-auth.guard';
 import { AuthController } from './infrastructure/auth.controller';
 import { LinkedInStrategy } from './infrastructure/strategies/linkedin.strategy';
+import { GoogleStrategy } from './infrastructure/strategies/google.strategy';
 
 @Module({
   imports: [
@@ -38,7 +39,7 @@ import { LinkedInStrategy } from './infrastructure/strategies/linkedin.strategy'
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, LinkedInStrategy],
+  providers: [AuthService, JwtAuthGuard, LinkedInStrategy, GoogleStrategy],
   exports: [JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}

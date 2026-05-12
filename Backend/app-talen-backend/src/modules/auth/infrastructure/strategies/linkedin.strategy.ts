@@ -2,13 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-oauth2';
 import { ConfigService } from '@nestjs/config';
-
-export interface ValidatedLinkedInUser {
-  email: string;
-  firstName: string;
-  providerId: string;
-  accessToken: string;
-}
+import { ExternalProfileDto } from '../../application/dto/external-profile.dto';
 
 interface LinkedInUserInfoResponse {
   email: string;
@@ -37,10 +31,10 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     profile: any,
     done: (
       err: Error | null,
-      user: ValidatedLinkedInUser | false,
+      user: ExternalProfileDto | false,
       info?: unknown,
     ) => void,
-  ): Promise<ValidatedLinkedInUser> {
+  ): Promise<ExternalProfileDto> {
     try {
       const response = await fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
@@ -54,11 +48,12 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
 
       const data = (await response.json()) as LinkedInUserInfoResponse;
 
-      const user: ValidatedLinkedInUser = {
+      const user: ExternalProfileDto = {
         email: data.email,
         firstName: data.given_name,
+        lastName: data.family_name || '',
         providerId: data.sub,
-        accessToken,
+        picture: data.picture,
       };
 
       done(null, user);

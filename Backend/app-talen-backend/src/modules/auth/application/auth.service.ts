@@ -14,8 +14,8 @@ import { AuthTokenPayload } from '../domain/auth-token-payload.type';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuthResponse } from './types/auth-response.type';
-import { ValidatedLinkedInUser } from '../infrastructure/strategies/linkedin.strategy';
 import { UserRole } from '../../users/domain/user-role.enum';
+import { ExternalProfileDto } from './dto/external-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -80,17 +80,20 @@ export class AuthService {
     return this.buildAuthResponse(user);
   }
 
-  async loginWithLinkedIn(
-    profile: ValidatedLinkedInUser,
+  async loginWithExternalProvider(
+    profile: ExternalProfileDto,
+    defaultRole: UserRole = UserRole.TALENT,
   ): Promise<AuthResponse> {
     const email = this.normalizeEmail(profile.email);
     let user = await this.usersRepository.findOne({ where: { email } });
 
     if (!user) {
+      const hashedPassword = await bcrypt.hash(profile.email, 10);
       user = this.usersRepository.create({
         email,
-        password: 'no_password_needed', // TODO: veirificar si es necesario un password o se puede dejar nulo
-        role: UserRole.TALENT,
+        password: hashedPassword,
+        imageUrl: profile.picture,
+        role: defaultRole,
       });
       user = await this.usersRepository.save(user);
     }
