@@ -17,6 +17,8 @@ services:
       TYPEORM_SYNC: "true"
       JWT_SECRET: change-this-secret
       JWT_EXPIRES_IN: 7d
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-dev-linkedin-client-id}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-dev-linkedin-client-secret}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
     ports:

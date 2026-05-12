@@ -1,0 +1,37 @@
+### Endpoints de Perfil de Empresa
+
+# GET - Listar todas las empresas
+GET http://localhost:3000/companies
+
+### GET - Obtener perfil de empresa por ID
+GET http://localhost:3000/companies/9f85bd2b-e6c5-4aca-97b1-0c6789999307
+
+### POST - Crear perfil de empresa (Autenticado)
+POST http://localhost:3000/companies/profile
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+
+{
+  "name": "Tech Solutions Inc.",
+  "industry": "Software Development",
+  "website": "https://www.techsolutions.com"
+}
+
+### GET - Obtener mi perfil de empresa (Autenticado)
+GET http://localhost:3000/companies/profile
+Authorization: Bearer <JWT_TOKEN>
+
+### PUT - Actualizar perfil de empresa (Autenticado)
+PUT http://localhost:3000/companies/profile
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+
+{
+  "name": "Tech Solutions Inc.",
+  "industry": "Software Development",
+  "website": "https://www.techsolutions.com"
+}
+
+### DELETE - Eliminar perfil de empresa (Autenticado)
+DELETE http://localhost:3000/companies/profile
+Authorization: Bearer <JWT_TOKEN>

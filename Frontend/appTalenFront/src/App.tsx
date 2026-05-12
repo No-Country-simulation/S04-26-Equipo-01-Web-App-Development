@@ -8,42 +8,33 @@ import { AuthPage } from './feactures/auth/AuthPage.tsx';
 import { TalentDashboard } from './feactures/profile/TalentDashboard';
 import { CompanyDashboard } from './feactures/marketplace/CompanyDashboard';
 import { AdminDashboard } from './feactures/admin/AdminDashboard';
-
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  role: 'TALENT' | 'COMPANY' | 'ADMIN';
-  [key: string]: unknown;
-}
+import { AcademyPro } from './feactures/academy/AcademyPro.tsx';
+import { getStoredAuthUser, loginAdmin } from './utils/admin-auth';
+import type { AuthUser } from './types/auth.types';
 
 function AppContent() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('authUser');
-
-    if (!token || !storedUser) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(storedUser) as AuthUser;
-    } catch {
-      localStorage.removeItem('authUser');
-      localStorage.removeItem('token');
-      return null;
-    }
-  });
+  const [user, setUser] = useState<AuthUser | null>(() => getStoredAuthUser());
 
   const handleGetStarted = () => {
     navigate('/register');
   };
 
   const handleLoginSuccess = (userData: AuthUser) => {
-    console.log('Autenticación exitosa:', userData);
     setUser(userData);
     navigate('/dashboard');
+  };
+
+  const handleAdminLogin = (email: string, password: string) => {
+    const adminUser = loginAdmin(email, password);
+
+    if (!adminUser) {
+      return false;
+    }
+
+    setUser(adminUser);
+    navigate('/dashboard');
+    return true;
   };
 
   const handleLogout = () => {
@@ -68,25 +59,30 @@ function AppContent() {
           {/* Rutas de Autenticación pasando el tab correspondiente */}
           <Route 
             path="/login" 
-            element={user ? <Navigate to="/dashboard" /> : <AuthPage onLoginSuccess={handleLoginSuccess} tab={0} />} 
+            element={
+              user ? <Navigate to="/dashboard" /> : <AuthPage onLoginSuccess={handleLoginSuccess} tab={0} handleAdminLogin={handleAdminLogin} />
+            }
           />
           <Route 
             path="/register" 
             element={user ? <Navigate to="/dashboard" /> : <AuthPage onLoginSuccess={handleLoginSuccess} tab={1} />} 
           />
 
-          <Route path="/dashboard" element={
-    user ? (
-      user.role === 'TALENT' ? <TalentDashboard user={user} /> :
-      user.role === 'COMPANY' ? <CompanyDashboard user={user} /> :
-      user.role === 'ADMIN' ? <AdminDashboard user={user} /> :
-      <Navigate to="/" />
-    ) : (
-      <Navigate to="/login" />
-    )
-  } />
+          <Route
+            path="/dashboard"
+            element={
+              user ? (
+                user.role === 'TALENT' ? <TalentDashboard user={user} /> :
+                user.role === 'COMPANY' ? <CompanyDashboard user={user} /> :
+                user.role === 'ADMIN' ? <AdminDashboard user={user} /> :
+                <Navigate to="/" />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
 
-  <Route path="/academia" element={user ? <AcademyPro /> : <Navigate to="/login" />} />
+          <Route path="/academia" element={user ? <AcademyPro /> : <Navigate to="/login" />} />
           
           {/* Redirección por si escriben cualquier otra cosa */}
           <Route path="*" element={<Navigate to="/" />} />
