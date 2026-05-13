@@ -21,20 +21,11 @@ interface LinkedInUserInfoResponse {
 @Injectable()
 export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
   constructor(private configService: ConfigService) {
-    const clientID =
-      configService.get<string>('LINKEDIN_CLIENT_ID') ||
-      process.env.LINKEDIN_CLIENT_ID ||
-      'dev-linkedin-client-id';
-    const clientSecret =
-      configService.get<string>('LINKEDIN_CLIENT_SECRET') ||
-      process.env.LINKEDIN_CLIENT_SECRET ||
-      'dev-linkedin-client-secret';
-
     super({
       authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
       tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
-      clientID,
-      clientSecret,
+      clientID: configService.get<string>('LINKEDIN_CLIENT_ID')!,
+      clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET')!,
       callbackURL: 'http://localhost:3000/auth/linkedin/callback',
       scope: ['openid', 'profile', 'email'],
     });
