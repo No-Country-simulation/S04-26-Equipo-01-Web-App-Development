@@ -1,11 +1,11 @@
-import { 
-  Controller, 
-  Post, 
-  Body, 
-  Get, 
-  Put, 
-  Delete, 
-  UseGuards, 
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Put,
+  Delete,
+  UseGuards,
   Req,
 } from '@nestjs/common';
 import { CompaniesService } from '../../application/companies.service';
@@ -44,7 +44,9 @@ export class CompaniesController {
 
   @Delete('profile')
   @UseGuards(JwtAuthGuard)
-  async deleteProfile(@Req() request: AuthenticatedRequest): Promise<{ message: string }> {
+  async deleteProfile(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<{ message: string }> {
     await this.companiesService.delete(request.user.userId);
     return { message: 'Company profile deleted successfully' };
   }
