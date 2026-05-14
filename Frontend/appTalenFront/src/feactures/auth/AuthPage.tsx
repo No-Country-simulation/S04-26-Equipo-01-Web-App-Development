@@ -3,13 +3,13 @@ import type { FC } from 'react';
 import { Box, Container, Typography, TextField, Button, Paper, Tabs, Tab } from '@mui/material';
 import { Google, LinkedIn } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import type { AuthUser } from '../../App';
 import { loginUser, registerUser } from '../../services/auth.service';
-import { UserRole, type LoginDto, type RegisterDto } from '../../types/auth.types';
+import { UserRole, type AuthUser, type LoginDto, type RegisterDto } from '../../types/auth.types';
 
 interface AuthPageProps {
   onLoginSuccess: (user: AuthUser) => void;
   tab?: number;
+  handleAdminLogin?: (email: string, password: string) => boolean;
 }
 
 interface FormErrors {
@@ -75,7 +75,7 @@ const validateRegisterPassword = (password: string): string | undefined => {
   return undefined;
 };
 
-export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }) => {
+export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, handleAdminLogin }) => {
   const navigate = useNavigate();
   const [internalTab, setInternalTab] = useState<number>(externalTab ?? 0); // 0 = Iniciar sesión, 1 = Registrarse
   const [role, setRole] = useState<'talento' | 'empresa'>('talento');
@@ -159,17 +159,20 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }
           password: formData.password,
           role: role === 'talento' ? UserRole.TALENT : UserRole.COMPANY,
         };
-
         await registerUser(payload);
         navigate('/login');
       } else {
+        // Lógica especial para Admin01
+        if (handleAdminLogin && handleAdminLogin(formData.email.trim(), formData.password)) {
+          // El login de admin fue exitoso, el resto ya lo maneja handleAdminLogin
+          return;
+        }
         const payload: LoginDto = {
           email: formData.email.trim(),
           password: formData.password,
         };
         const response = await loginUser(payload);
         const token = response.accessToken;
-
         if (token && response.user) {
           localStorage.setItem('token', token);
           const authUser: AuthUser = {
