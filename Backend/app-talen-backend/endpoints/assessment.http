@@ -27,3 +27,85 @@ Authorization: Bearer {{accessToken}}
 ### Get my latest assessment
 GET {{baseUrl}}/assessments/me/latest
 Authorization: Bearer {{accessToken}}
+
+### Get psychotechnical test questions
+GET {{baseUrl}}/assessments/psychotechnical-tests/questions
+Authorization: Bearer {{accessToken}}
+
+### Submit my psychotechnical test
+POST {{baseUrl}}/assessments/me/psychotechnical-tests/submit
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "answers": {
+    "psy_logic_1": "b",
+    "psy_attention_1": "c",
+    "psy_decision_1": "a",
+    "psy_teamwork_1": "b",
+    "psy_adaptability_1": "c"
+  }
+}
+
+### Get technical test questions
+GET {{baseUrl}}/assessments/technical-tests/questions
+Authorization: Bearer {{accessToken}}
+
+### Submit my technical test
+POST {{baseUrl}}/assessments/me/technical-tests/submit
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "answers": {
+    "tech_api_1": "b",
+    "tech_db_1": "a",
+    "tech_auth_1": "c",
+    "tech_validation_1": "b",
+    "tech_security_1": "a"
+  }
+}
+
+### Create my psychotechnical test result
+POST {{baseUrl}}/assessments/me/psychotechnical-tests
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Prueba psicotecnica inicial",
+  "answers": {
+    "logicReasoning": "medium",
+    "attentionToDetail": "high",
+    "stressTolerance": "medium",
+    "teamwork": "high"
+  },
+  "score": 78,
+  "maxScore": 100,
+  "feedback": "Buen desempeno general. Conviene reforzar velocidad de resolucion y manejo de presion."
+}
+
+### Create my technical test result
+POST {{baseUrl}}/assessments/me/technical-tests
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Prueba tecnica backend inicial",
+  "answers": {
+    "javascript": "intermediate",
+    "nestjs": "basic",
+    "sql": "basic",
+    "apiDesign": "intermediate"
+  },
+  "score": 62,
+  "maxScore": 100,
+  "feedback": "Tiene bases para APIs REST. Reforzar TypeORM, testing y consultas SQL."
+}
+
+### Get my assessment test results
+GET {{baseUrl}}/assessments/me/test-results
+Authorization: Bearer {{accessToken}}
+
+### Get my latest assessment test results
+GET {{baseUrl}}/assessments/me/test-results/latest
+Authorization: Bearer {{accessToken}}

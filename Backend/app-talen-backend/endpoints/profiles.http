@@ -56,3 +56,39 @@ Content-Type: application/json
 ### Recalculate my employability score
 PATCH {{baseUrl}}/profiles/me/employability-score
 Authorization: Bearer {{accessToken}}
+
+### Analyze my CV from extracted text
+POST {{baseUrl}}/profiles/me/cv/analyze
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applyToProfile": false,
+  "extractedText": "Juan Perez\nBackend Developer Junior\nExperiencia: 1 anio trabajando con Node.js, NestJS, PostgreSQL y Git. Busco mi primer empleo formal como developer backend. Conocimientos de APIs REST, TypeORM y testing basico."
+}
+
+### Analyze my CV from extracted text and apply missing profile fields
+POST {{baseUrl}}/profiles/me/cv/analyze
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applyToProfile": true,
+  "extractedText": "Juan Perez\nBackend Developer Junior\nBuenos Aires, Argentina\nExperiencia: 1 anio con Node.js, NestJS, PostgreSQL y Git. Interesado en modalidad hibrida o remota. Busco crecer como backend developer."
+}
+
+### Analyze my CV from PDF file
+POST {{baseUrl}}/profiles/me/cv/analyze
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=BoundaryCv
+
+--BoundaryCv
+Content-Disposition: form-data; name="applyToProfile"
+
+true
+--BoundaryCv
+Content-Disposition: form-data; name="file"; filename="cv.pdf"
+Content-Type: application/pdf
+
+< ./cv.pdf
+--BoundaryCv--

@@ -56,3 +56,50 @@ export interface UpdateWorkPreferencesDto {
 export interface UpdateInterestedRolesDto {
   interestedRoles: InterestedRole[];
 }
+
+export interface CvProfileSuggestions {
+  fullName?: string;
+  location?: string;
+  country?: string;
+  preferredModality?: WorkModality;
+  headline?: string;
+  professionalBio?: string;
+  yearsExperience?: number;
+  interestedRoles?: InterestedRole[];
+}
+
+export interface CvAssessmentSuggestions {
+  digitalLevel?: 'basic' | 'intermediate' | 'advanced';
+  cognitiveLevel?: 'basic' | 'intermediate' | 'advanced';
+  socioEmotionalLevel?: 'basic' | 'intermediate' | 'advanced';
+  careerGoal?: string;
+  answers: Record<string, unknown>;
+}
+
+export interface CvSkillSuggestion {
+  name: string;
+  category: string;
+  level: 'INITIAL' | 'MEDIUM' | 'ADVANCED';
+}
+
+export interface CvAnalysisResponse {
+  summary: string;
+  profileSuggestions: CvProfileSuggestions;
+  assessmentSuggestions: CvAssessmentSuggestions;
+  suggestedSkills: CvSkillSuggestion[];
+  fileName?: string;
+  extractedTextLength: number;
+  appliedFields: string[];
+  updatedProfile?: Profile;
+}
+
+export interface AnalyzeCvTextDto {
+  extractedText: string;
+  applyToProfile?: boolean;
+}
+
+export interface AnalyzeCvFileDto {
+  file: File;
+  applyToProfile?: boolean;
+  extractedText?: string;
+}
