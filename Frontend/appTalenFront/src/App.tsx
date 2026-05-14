@@ -83,7 +83,13 @@ function AppContent() {
           />
 
           <Route path="/academia" element={user ? <AcademyPro /> : <Navigate to="/login" />} />
-          
+          {/* TEST Route - Remove in production */}
+          <Route 
+            path="/test/talent-dashboard" 
+            element={
+              <TalentDashboard user={{ id: 'test', name: 'Test User', email: 'test@example.com', role: 'TALENT' }} />
+            } 
+          />          
           {/* Redirección por si escriben cualquier otra cosa */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
