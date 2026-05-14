@@ -2,13 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-oauth2';
 import { ConfigService } from '@nestjs/config';
-
-export interface ValidatedLinkedInUser {
-  email: string;
-  firstName: string;
-  providerId: string;
-  accessToken: string;
-}
+import { ExternalProfileDto } from '../../application/dto/external-profile.dto';
 
 interface LinkedInUserInfoResponse {
   email: string;
@@ -21,20 +15,11 @@ interface LinkedInUserInfoResponse {
 @Injectable()
 export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
   constructor(private configService: ConfigService) {
-    const clientID =
-      configService.get<string>('LINKEDIN_CLIENT_ID') ||
-      process.env.LINKEDIN_CLIENT_ID ||
-      'dev-linkedin-client-id';
-    const clientSecret =
-      configService.get<string>('LINKEDIN_CLIENT_SECRET') ||
-      process.env.LINKEDIN_CLIENT_SECRET ||
-      'dev-linkedin-client-secret';
-
     super({
       authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
       tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
-      clientID,
-      clientSecret,
+      clientID: configService.get<string>('LINKEDIN_CLIENT_ID')!,
+      clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET')!,
       callbackURL: 'http://localhost:3000/auth/linkedin/callback',
       scope: ['openid', 'profile', 'email'],
     });
@@ -46,10 +31,10 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
     profile: any,
     done: (
       err: Error | null,
-      user: ValidatedLinkedInUser | false,
+      user: ExternalProfileDto | false,
       info?: unknown,
     ) => void,
-  ): Promise<ValidatedLinkedInUser> {
+  ): Promise<ExternalProfileDto> {
     try {
       const response = await fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
@@ -63,11 +48,12 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
 
       const data = (await response.json()) as LinkedInUserInfoResponse;
 
-      const user: ValidatedLinkedInUser = {
+      const user: ExternalProfileDto = {
         email: data.email,
         firstName: data.given_name,
+        lastName: data.family_name || '',
         providerId: data.sub,
-        accessToken,
+        picture: data.picture,
       };
 
       done(null, user);
