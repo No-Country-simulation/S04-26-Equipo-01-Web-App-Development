@@ -242,7 +242,7 @@ const extractListBySection = (lines: string[], keys: string[], maxLines = 8): st
   }
 
   return block
-    .split(/,|\||;|\u2022|\-/)
+    .split(/,|\||;|\u2022|-/)
     .map((item) => item.trim())
     .filter((item) => item.length > 1)
     .slice(0, 12);
@@ -280,12 +280,12 @@ export const extractSkillsFromCvText = (text: string): { technicalSkills: string
 const extractSocialLinks = (text: string): { linkedin?: string; github?: string; [key: string]: string | undefined } | undefined => {
   const links: { linkedin?: string; github?: string; [key: string]: string | undefined } = {};
 
-  const linkedinMatch = text.match(/linkedin\.com\/in\/[\w\-]+/i);
+  const linkedinMatch = text.match(/linkedin\.com\/in\/[\w-]+/i);
   if (linkedinMatch) {
     links.linkedin = `https://${linkedinMatch[0]}`;
   }
 
-  const githubMatch = text.match(/github\.com\/[\w\-]+/i);
+  const githubMatch = text.match(/github\.com\/[\w-]+/i);
   if (githubMatch) {
     links.github = `https://${githubMatch[0]}`;
   }
@@ -306,12 +306,12 @@ export const parseCvText = (text: string): ParsedCvData => {
   const phoneMatches = text.match(/\+?\d{1,3}[\s.-]?\(?[\d\s.-]{6,15}\)?/g) || [];
   let phone = phoneMatches[0] || '';
   if (!phone) {
-    const phoneMatch = text.match(/[\(]?\d{2,4}[\)]?[\s.-]?\d{3,4}[\s.-]?\d{4,5}/);
+     const phoneMatch = text.match(/[(]?\d{2,4}[)]?[\s.-]?\d{3,4}[\s.-]?\d{4,5}/);
     phone = phoneMatch?.[0] || '';
   }
 
   let fullName =
-    getBestLineMatch(lines.slice(0, 15), /^[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'\-\s]{6,}$/) ||
+    getBestLineMatch(lines.slice(0, 15), /^[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'\s-]{6,}$/) ||
     lines.slice(0, 15).find((line) => isLikelyPersonName(line)) ||
     '';
 

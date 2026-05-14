@@ -112,7 +112,7 @@ const sanitizeCompany = (value: string): string => {
 
     for (let i = tokens.length - 1; i >= 0; i--) {
       const token = tokens[i].replace(/[,.;]+$/, '');
-      if (/^[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.'()\-]*$/u.test(token)) {
+      if (/^[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.'()-]*$/u.test(token)) {
         suffix.unshift(tokens[i]);
         if (suffix.length >= 3) {
           break;
@@ -274,8 +274,8 @@ const extractExperiences = (text: string): Experience[] => {
       if (lineDateRegex.test(candidate)) {
         break;
       }
-      if (/^[•●\-]/.test(candidate)) {
-        const cleaned = cleanField(candidate.replace(/^[•●\-\s]+/, ''));
+      if (/^[•●-]/.test(candidate)) {
+        const cleaned = cleanField(candidate.replace(/^[•●-\s]+/, ''));
         if (cleaned.length > 8) {
           highlights.push(cleaned);
         }
@@ -293,12 +293,12 @@ const extractExperiences = (text: string): Experience[] => {
   }
 
   const headerWithPipeRegex = new RegExp(
-    `([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.,'()\\-\\s]{2,80}?)\\s*\\|\\s*([A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.,'()\\-/\\s]{2,90}?)\\s+(${SPANISH_MONTHS})\\s+(\\d{4})\\s*[–-]\\s*(Actualidad|Present|${SPANISH_MONTHS})\\s*(\\d{4})?`,
+    `([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.,'()\\s-]{2,80}?)\\s*\\|\\s*([A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.,'()/\\s-]{2,90}?)\\s+(${SPANISH_MONTHS})\\s+(\\d{4})\\s*[–-]\\s*(Actualidad|Present|${SPANISH_MONTHS})\\s*(\\d{4})?`,
     'gi',
   );
 
   const headerWithoutPipeRegex = new RegExp(
-    `([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.,'()\\-]{1,}(?:\\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.,'()\\-]{1,}){0,4})\\s*,?\\s+(${EXPERIENCE_ROLE_PATTERN}(?:\\s+[A-Za-zÁÉÍÓÚÑáéíóúñ0-9/&.\\-]+){0,4})\\s*[—-]?\\s*(${SPANISH_MONTHS})\\s*,?\\s*(\\d{4})\\s*[–-]\\s*(Actualidad|Present|${SPANISH_MONTHS})\\s*,?\\s*(\\d{4})?`,
+    `([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.,'()-]{1,}(?:\\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.,'()-]{1,}){0,4})\\s*,?\\s+(${EXPERIENCE_ROLE_PATTERN}(?:\\s+[A-Za-zÁÉÍÓÚÑáéíóúñ0-9/&.-]+){0,4})\\s*[—-]?\\s*(${SPANISH_MONTHS})\\s*,?\\s*(\\d{4})\\s*[–-]\\s*(Actualidad|Present|${SPANISH_MONTHS})\\s*,?\\s*(\\d{4})?`,
     'gi',
   );
 
@@ -312,7 +312,7 @@ const extractExperiences = (text: string): Experience[] => {
     const nextStart = index + 1 < allMatches.length ? (allMatches[index + 1].index ?? compact.length) : compact.length;
     const detailBlock = compact.slice(currentEnd, nextStart);
 
-    const bulletMatches = Array.from(detailBlock.matchAll(/[•●\-]\s*([^•●]+)/g));
+    const bulletMatches = Array.from(detailBlock.matchAll(/[•●-]\s*([^•●]+)/g));
     const highlights = bulletMatches
       .map((b) => cleanField(b[1]))
       .filter((item) => item.length > 8);
@@ -353,7 +353,7 @@ const extractExperiences = (text: string): Experience[] => {
 
     const contextBefore = compact.slice(Math.max(0, matchStart - 120), matchStart);
     const companyTailMatch = contextBefore.match(
-      /([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.'()\-]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.'()\-]+){0,4})\s*(?:\||,)?\s*$/u,
+      /([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.'()-]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ0-9&.'()-]+){0,4})\s*(?:\||,)?\s*$/u,
     );
 
     const rawCompany = companyTailMatch?.[1] ?? '';
@@ -363,7 +363,7 @@ const extractExperiences = (text: string): Experience[] => {
     const endDate = match[5] ? `${match[4]} ${match[5]}` : match[4];
 
     const detailBlock = compact.slice(currentEnd, nextStart);
-    const bulletMatches = Array.from(detailBlock.matchAll(/[•●\-]\s*([^•●]+)/g));
+    const bulletMatches = Array.from(detailBlock.matchAll(/[•●-]\s*([^•●]+)/g));
     const highlights = bulletMatches
       .map((b) => cleanField(b[1]))
       .filter((item) => item.length > 8);
