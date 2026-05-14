@@ -14,6 +14,9 @@ import { UserModuleProgress } from '../../../learning/infrastructure/entities/us
 import { UserSkill } from '../../../skills/infrastructure/entities/user-skill.entity';
 import { InterestedRole } from '../../domain/interested-role.enum';
 import { WorkModality } from '../../domain/work-modality.enum';
+import { CvDiagnostic } from './cv-diagnostic.entity';
+import { ProfileEducation } from './profile-education.entity';
+import { ProfileExperience } from './profile-experience.entity';
 
 @Entity('profiles')
 export class Profile {
@@ -82,4 +85,13 @@ export class Profile {
 
   @OneToMany(() => CandidateApplication, (application) => application.profile)
   applications!: CandidateApplication[];
+
+  @OneToMany(() => CvDiagnostic, (cvDiagnostic) => cvDiagnostic.profile)
+  cvDiagnostics!: CvDiagnostic[];
+
+  @OneToMany(() => ProfileExperience, (experience) => experience.profile)
+  experiences!: ProfileExperience[];
+
+  @OneToMany(() => ProfileEducation, (education) => education.profile)
+  educations!: ProfileEducation[];
 }

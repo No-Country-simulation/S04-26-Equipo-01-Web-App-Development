@@ -3,9 +3,11 @@ import { throwBackendError } from './api-error';
 import type {
   AnalyzeCvFileDto,
   AnalyzeCvTextDto,
+  CvDiagnostic,
   CreateProfileDto,
   CvAnalysisResponse,
   Profile,
+  SaveCvDiagnosticDto,
   UpdateInterestedRolesDto,
   UpdateProfileDto,
   UpdateWorkPreferencesDto,
@@ -119,6 +121,35 @@ export const analyzeMyCvFromFile = async ({
       },
     );
 
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+
+export const saveMyCvDiagnostic = async (
+  data: SaveCvDiagnosticDto,
+): Promise<CvDiagnostic> => {
+  try {
+    const response = await api.post<CvDiagnostic>('/profiles/me/cv/diagnostics', data);
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+
+export const getMyCvDiagnostics = async (): Promise<CvDiagnostic[]> => {
+  try {
+    const response = await api.get<CvDiagnostic[]>('/profiles/me/cv/diagnostics');
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+
+export const getMyLatestCvDiagnostic = async (): Promise<CvDiagnostic> => {
+  try {
+    const response = await api.get<CvDiagnostic>('/profiles/me/cv/diagnostics/latest');
     return response.data;
   } catch (error: unknown) {
     return throwBackendError(error);

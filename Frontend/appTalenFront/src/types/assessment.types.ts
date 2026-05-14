@@ -111,3 +111,25 @@ export interface CreateAssessmentTestDto {
   maxScore?: number;
   feedback?: string;
 }
+
+export interface GeneratedTest {
+  id: string;
+  name: string;
+  description: string;
+  type: AssessmentTestType;
+  skillName?: string;
+  questionCount: number;
+  estimatedDurationMin: number;
+  questions: AssessmentTestQuestion[];
+}
+
+export interface GeneratedTestsResponseDto {
+  psychotechnicalTests: GeneratedTest[];
+  technicalTests: GeneratedTest[];
+  totalTests: number;
+  profile: {
+    fullName: string;
+    technicalSkillsCount: number;
+    totalQuestionsCount: number;
+  };
+}

@@ -7,6 +7,7 @@ import type {
   CreateAssessmentTestDto,
   CreateAssessmentDto,
   SubmitAssessmentTestDto,
+  GeneratedTestsResponseDto,
 } from '../types/assessment.types';
 
 export const createMyAssessment = async (
@@ -145,3 +146,78 @@ export const getMyLatestAssessmentTestResults = async (): Promise<
     return throwBackendError(error);
   }
 };
+
+export const generateTestsForProfile = async (): Promise<GeneratedTestsResponseDto> => {
+  try {
+    const response = await api.post<GeneratedTestsResponseDto>(
+      '/assessments/me/generate-tests',
+    );
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+
+export const submitPsychotechnicalTest = async (
+  data: SubmitAssessmentTestDto,
+): Promise<AssessmentTestResultEntity> => {
+  try {
+    const response = await api.post<AssessmentTestResultEntity>(
+      '/assessments/me/psychotechnical-tests/submit',
+      data,
+    );
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+
+export const submitTechnicalTest = async (
+  data: SubmitAssessmentTestDto,
+): Promise<AssessmentTestResultEntity> => {
+  try {
+    const response = await api.post<AssessmentTestResultEntity>(
+      '/assessments/me/technical-tests/submit',
+      data,
+    );
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+
+export const getMyLatestTestResults = async (): Promise<
+  AssessmentTestResultEntity[]
+> => {
+  try {
+    const response = await api.get<AssessmentTestResultEntity[]>(
+      '/assessments/me/test-results/latest',
+    );
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+
+export const getMyAllTestResults = async (): Promise<
+  AssessmentTestResultEntity[]
+> => {
+  try {
+    const response = await api.get<AssessmentTestResultEntity[]>(
+      '/assessments/me/test-results',
+    );
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+
+export const consolidateMyAssessment = async (): Promise<Assessment> => {
+  try {
+    const response = await api.post<Assessment>('/assessments/me/consolidate');
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+

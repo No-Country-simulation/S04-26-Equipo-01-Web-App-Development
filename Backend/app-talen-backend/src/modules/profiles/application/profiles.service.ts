@@ -20,8 +20,12 @@ import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateInterestedRolesDto } from './dto/update-interested-roles.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateWorkPreferencesDto } from './dto/update-work-preferences.dto';
+import { SaveCvDiagnosticDto } from './dto/save-cv-diagnostic.dto';
 import { CvAnalysisResponse } from '../domain/cv-analysis-response.type';
 import { UploadedCvFile } from '../domain/uploaded-cv-file.type';
+import { CvDiagnostic } from '../infrastructure/entities/cv-diagnostic.entity';
+import { ProfileEducation } from '../infrastructure/entities/profile-education.entity';
+import { ProfileExperience } from '../infrastructure/entities/profile-experience.entity';
 import { Profile } from '../infrastructure/entities/profile.entity';
 
 @Injectable()
@@ -29,6 +33,12 @@ export class ProfilesService {
   constructor(
     @InjectRepository(Profile)
     private readonly profilesRepository: Repository<Profile>,
+    @InjectRepository(CvDiagnostic)
+    private readonly cvDiagnosticsRepository: Repository<CvDiagnostic>,
+    @InjectRepository(ProfileExperience)
+    private readonly profileExperiencesRepository: Repository<ProfileExperience>,
+    @InjectRepository(ProfileEducation)
+    private readonly profileEducationsRepository: Repository<ProfileEducation>,
     @InjectRepository(Assessment)
     private readonly assessmentsRepository: Repository<Assessment>,
     @InjectRepository(UserModuleProgress)
@@ -156,13 +166,91 @@ export class ProfilesService {
       updatedProfile = await this.profilesRepository.save(profile);
     }
 
+    const profile = await this.findMyProfile(authUser.userId);
+    const savedDiagnostic = await this.cvDiagnosticsRepository.save(
+      this.cvDiagnosticsRepository.create({
+        profileId: profile.id,
+        fileName: file?.originalname,
+        extractedTextLength: cvText.length,
+        rawText: cvText,
+        summary: analysis.summary,
+        technicalSkills: analysis.suggestedSkills
+          .filter((skill) => skill.category.toLowerCase() === 'technical')
+          .map((skill) => skill.name),
+        personalSkills: analysis.suggestedSkills
+          .filter((skill) => skill.category.toLowerCase() === 'personal')
+          .map((skill) => skill.name),
+        aiAnalysis: analysis as unknown as Record<string, unknown>,
+      }),
+    );
+
     return {
       ...analysis,
       fileName: file?.originalname,
       extractedTextLength: cvText.length,
       appliedFields,
       updatedProfile,
+      diagnosticId: savedDiagnostic.id,
     };
+  }
+
+  async saveMyCvDiagnostic(
+    authUser: AuthTokenPayload,
+    saveCvDiagnosticDto: SaveCvDiagnosticDto,
+  ): Promise<CvDiagnostic> {
+    this.ensureTalent(authUser);
+
+    const profile = await this.findMyProfile(authUser.userId);
+    await this.replaceProfileCvSections(profile.id, saveCvDiagnosticDto);
+
+    const rawText = saveCvDiagnosticDto.rawText?.trim() || undefined;
+    const diagnostic = this.cvDiagnosticsRepository.create({
+      profileId: profile.id,
+      fileName: saveCvDiagnosticDto.fileName?.trim() || undefined,
+      extractedTextLength: rawText ? rawText.length : 0,
+      rawText,
+      summary: saveCvDiagnosticDto.summary?.trim() || undefined,
+      technicalSkills: saveCvDiagnosticDto.skills.technical,
+      personalSkills: saveCvDiagnosticDto.skills.personal,
+      snapshot: {
+        profile: saveCvDiagnosticDto.profile,
+        skills: saveCvDiagnosticDto.skills,
+        experience: saveCvDiagnosticDto.experience ?? [],
+        education: saveCvDiagnosticDto.education ?? [],
+      },
+      aiAnalysis: saveCvDiagnosticDto.aiAnalysis,
+    });
+
+    return this.cvDiagnosticsRepository.save(diagnostic);
+  }
+
+  async findMyCvDiagnostics(authUser: AuthTokenPayload): Promise<CvDiagnostic[]> {
+    this.ensureTalent(authUser);
+
+    const profile = await this.findMyProfile(authUser.userId);
+
+    return this.cvDiagnosticsRepository.find({
+      where: { profileId: profile.id },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findMyLatestCvDiagnostic(
+    authUser: AuthTokenPayload,
+  ): Promise<CvDiagnostic> {
+    this.ensureTalent(authUser);
+
+    const profile = await this.findMyProfile(authUser.userId);
+    const diagnostic = await this.cvDiagnosticsRepository.findOne({
+      where: { profileId: profile.id },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!diagnostic) {
+      throw new NotFoundException('No CV diagnostics found for this user');
+    }
+
+    return diagnostic;
   }
 
   private async findMyProfile(userId: string): Promise<Profile> {
@@ -404,5 +492,49 @@ export class ProfilesService {
     }
 
     return appliedFields;
+  }
+
+  private async replaceProfileCvSections(
+    profileId: string,
+    saveCvDiagnosticDto: SaveCvDiagnosticDto,
+  ): Promise<void> {
+    await Promise.all([
+      this.profileExperiencesRepository.delete({ profileId }),
+      this.profileEducationsRepository.delete({ profileId }),
+    ]);
+
+    const experiences = (saveCvDiagnosticDto.experience ?? []).map(
+      (experience, index) =>
+        this.profileExperiencesRepository.create({
+          profileId,
+          company: experience.company,
+          position: experience.position,
+          startDate: experience.startDate,
+          endDate: experience.endDate,
+          description: experience.description,
+          highlights: experience.highlights ?? [],
+          sortOrder: index,
+        }),
+    );
+
+    const educations = (saveCvDiagnosticDto.education ?? []).map(
+      (education, index) =>
+        this.profileEducationsRepository.create({
+          profileId,
+          institution: education.institution,
+          degree: education.degree,
+          details: education.details,
+          status: education.status,
+          sortOrder: index,
+        }),
+    );
+
+    if (experiences.length > 0) {
+      await this.profileExperiencesRepository.save(experiences);
+    }
+
+    if (educations.length > 0) {
+      await this.profileEducationsRepository.save(educations);
+    }
   }
 }

@@ -91,6 +91,54 @@ export interface CvAnalysisResponse {
   extractedTextLength: number;
   appliedFields: string[];
   updatedProfile?: Profile;
+  diagnosticId?: string;
+}
+
+export interface SaveCvDiagnosticDto {
+  fileName?: string;
+  rawText?: string;
+  summary?: string;
+  profile: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    title?: string;
+    professionalSummary?: string;
+  };
+  skills: {
+    technical: string[];
+    personal: string[];
+  };
+  experience?: Array<{
+    company: string;
+    position: string;
+    startDate?: string;
+    endDate?: string;
+    description?: string;
+    highlights?: string[];
+  }>;
+  education?: Array<{
+    institution: string;
+    degree: string;
+    details?: string;
+    status?: string;
+  }>;
+  aiAnalysis?: Record<string, unknown>;
+}
+
+export interface CvDiagnostic {
+  id: string;
+  profileId: string;
+  fileName?: string;
+  extractedTextLength: number;
+  rawText?: string;
+  summary?: string;
+  technicalSkills: string[];
+  personalSkills: string[];
+  snapshot?: Record<string, unknown>;
+  aiAnalysis?: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface AnalyzeCvTextDto {

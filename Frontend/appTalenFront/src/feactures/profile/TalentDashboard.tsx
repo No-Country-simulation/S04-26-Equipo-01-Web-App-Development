@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { 
   Box, 
   Typography, 
@@ -16,18 +16,22 @@ import { CloudUploadOutlined, ErrorOutlined } from '@mui/icons-material';
 import type { AuthUser } from '../../types/auth.types';
 import type { ParsedCvDataAdvanced } from '../../utils/cv-parser-advanced';
 import { parseAdvancedCv } from '../../utils/cv-parser-advanced';
+import { createMyProfile, getMyLatestCvDiagnostic, saveMyCvDiagnostic } from '../../services/profile.service';
+import { createMySkill, getMySkills, updateMySkill } from '../../services/skill.service';
+import { getMyAllTestResults } from '../../services/assessment.service';
+import { getMyLearningPaths } from '../../services/learning.service';
+import type { CvDiagnostic } from '../../types/profile.types';
+import type { SkillLevel, UserSkill } from '../../types/skill.types';
+import type { AssessmentTestResultEntity } from '../../types/assessment.types';
+import type { LearningPath } from '../../types/learning.types';
+import { AssessmentTestsPanel, AssessmentResultsPanel } from '../../components/AssessmentTestsPanel';
+import { LearningRoadmapPanel } from '../../components/LearningRoadmapPanel';
 
 interface TalentDashboardProps {
   user: AuthUser;
 }
 
 export const TalentDashboard = ({ user }: TalentDashboardProps) => {
-  // Estos valores vendran del backend mas adelante
-  const profileCompletion = 75;
-  const evaluationsCount = "2/3";
-  const coursesInProgress = 4;
-  const validatedSkills = "+12";
-
   const sidebarSections = [
     {
       title: 'EVALUACION PERFIL',
@@ -61,7 +65,359 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   const [rawCvText, setRawCvText] = useState('');
   const [advancedCvData, setAdvancedCvData] = useState<ParsedCvDataAdvanced | null>(null);
   const [cvFormData, setCvFormData] = useState<ParsedCvDataAdvanced | null>(null);
+  const [isSavingCv, setIsSavingCv] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const [isLoadingDiagnostic, setIsLoadingDiagnostic] = useState(true);
+  const [isLoadingProfileSkills, setIsLoadingProfileSkills] = useState(true);
+  const [latestDiagnostic, setLatestDiagnostic] = useState<CvDiagnostic | null>(null);
+  const [profileSkills, setProfileSkills] = useState<UserSkill[]>([]);
+  const [assessmentTestResults, setAssessmentTestResults] = useState<AssessmentTestResultEntity[]>([]);
+  const [learningPaths, setLearningPaths] = useState<LearningPath[]>([]);
+  const [onboardingModeEnabled, setOnboardingModeEnabled] = useState(false);
+  const [learningRoadmapRefreshToken, setLearningRoadmapRefreshToken] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const toParsedCvData = (diagnostic: CvDiagnostic): ParsedCvDataAdvanced | null => {
+    const snapshot = diagnostic.snapshot as
+      | {
+          profile?: {
+            fullName?: string;
+            email?: string;
+            phone?: string;
+            location?: string;
+            title?: string;
+            professionalSummary?: string;
+          };
+          skills?: {
+            technical?: string[];
+            personal?: string[];
+          };
+          experience?: Array<{
+            company?: string;
+            position?: string;
+            startDate?: string;
+            endDate?: string;
+            description?: string;
+            highlights?: string[];
+          }>;
+          education?: Array<{
+            institution?: string;
+            degree?: string;
+            details?: string;
+            status?: string;
+          }>;
+        }
+      | undefined;
+
+    if (!snapshot) {
+      return null;
+    }
+
+    return {
+      profile: {
+        fullName: snapshot.profile?.fullName ?? '',
+        email: snapshot.profile?.email ?? '',
+        phone: snapshot.profile?.phone ?? '',
+        location: snapshot.profile?.location ?? '',
+        title: snapshot.profile?.title,
+        professionalSummary: snapshot.profile?.professionalSummary ?? '',
+      },
+      experience: (snapshot.experience ?? []).map((experience) => ({
+        company: experience.company ?? '',
+        position: experience.position ?? '',
+        startDate: experience.startDate ?? '',
+        endDate: experience.endDate ?? '',
+        description: experience.description ?? '',
+        highlights: experience.highlights ?? [],
+      })),
+      education: (snapshot.education ?? []).map((education) => ({
+        institution: education.institution ?? '',
+        degree: education.degree ?? '',
+        details: education.details,
+        status:
+          education.status === 'in-progress' || education.status === 'completed'
+            ? education.status
+            : undefined,
+      })),
+      skills: {
+        technical: snapshot.skills?.technical ?? diagnostic.technicalSkills,
+        personal: snapshot.skills?.personal ?? diagnostic.personalSkills,
+      },
+    };
+  };
+
+  const hasPsychotechnicalAndTechnicalResults = (
+    results: AssessmentTestResultEntity[],
+  ): boolean => {
+    const hasPsychotechnical = results.some(
+      (result) => result.type === 'PSYCHOTECHNICAL',
+    );
+    const hasTechnical = results.some((result) => result.type === 'TECHNICAL');
+    return hasPsychotechnical && hasTechnical;
+  };
+
+  const onboardingStorageKey = `talent-onboarding-completed-${user.email ?? user.name ?? 'default'}`;
+
+  useEffect(() => {
+    const loadProfileData = async () => {
+      try {
+        const [diagnostic, skills, tests, paths] = await Promise.all([
+          getMyLatestCvDiagnostic().catch(() => null),
+          getMySkills().catch(() => []),
+          getMyAllTestResults().catch(() => []),
+          getMyLearningPaths().catch(() => []),
+        ]);
+
+        setProfileSkills(skills);
+        setAssessmentTestResults(tests);
+        setLearningPaths(paths);
+
+        const alreadyCompleted = window.localStorage.getItem(onboardingStorageKey) === '1';
+        const shouldMarkCompleted = alreadyCompleted || paths.length > 0;
+        if (shouldMarkCompleted) {
+          window.localStorage.setItem(onboardingStorageKey, '1');
+          setOnboardingModeEnabled(false);
+        } else {
+          setOnboardingModeEnabled(true);
+        }
+
+        if (!diagnostic) {
+          setLatestDiagnostic(null);
+          setAdvancedCvData(null);
+          return;
+        }
+
+        setLatestDiagnostic(diagnostic);
+        const parsedCvData = toParsedCvData(diagnostic);
+        if (parsedCvData) {
+          setAdvancedCvData(parsedCvData);
+          setCvFormData(parsedCvData);
+        }
+      } catch {
+        setLatestDiagnostic(null);
+        setAdvancedCvData(null);
+        setProfileSkills([]);
+        setAssessmentTestResults([]);
+        setLearningPaths([]);
+      } finally {
+        setIsLoadingDiagnostic(false);
+        setIsLoadingProfileSkills(false);
+      }
+    };
+
+    void loadProfileData();
+  }, [onboardingStorageKey]);
+
+  const toSkillLevel = (): SkillLevel => 'INITIAL';
+
+  const buildCvSummary = (data: ParsedCvDataAdvanced): string => {
+    const technicalCount = data.skills.technical.length;
+    const personalCount = data.skills.personal.length;
+    const experienceCount = data.experience.length;
+
+    return `Perfil inicial detectado: ${experienceCount} experiencias, ${technicalCount} skills tecnicas y ${personalCount} skills personales.`;
+  };
+
+  const normalizeSkillName = (name: string): string => name.trim().toLowerCase();
+
+  const hasCvUploaded = latestDiagnostic !== null;
+  const hasSkillsGenerated = profileSkills.length > 0;
+  const hasTestsCompleted = hasPsychotechnicalAndTechnicalResults(assessmentTestResults);
+  const hasRoadmapGenerated = learningPaths.length > 0;
+  const hasPsychotechnicalResults = assessmentTestResults.some(
+    (result) => result.type === 'PSYCHOTECHNICAL',
+  );
+  const hasTechnicalResults = assessmentTestResults.some(
+    (result) => result.type === 'TECHNICAL',
+  );
+  const onboardingCompletedSteps = [
+    hasCvUploaded,
+    hasSkillsGenerated,
+    hasTestsCompleted,
+    hasRoadmapGenerated,
+  ].filter(Boolean).length;
+
+  const onboardingProgressPercentage = Math.round((onboardingCompletedSteps / 4) * 100);
+  const evaluationsCount = `${onboardingCompletedSteps}/4`;
+
+  const coursesInProgress = learningPaths
+    .flatMap((path) => path.modules ?? [])
+    .filter((module) => module.progress?.[0]?.status === 'IN_PROGRESS').length;
+
+  const validatedSkills = `+${profileSkills.length}`;
+
+  const suggestedStep = !hasCvUploaded
+    ? {
+        title: 'Inicia tu configuracion rapida de talento',
+        description:
+          'Necesitamos cargar tu CV para comenzar el proceso de perfilado.',
+        buttonLabel: 'INICIAR TEST',
+        targetMenuItem: 'Cargar Nuevo CV',
+      }
+    : !hasSkillsGenerated
+      ? {
+          title: 'Confirma y guarda tus skills detectadas',
+          description:
+            'Revisa los datos del CV y guarda los skills para continuar con las pruebas.',
+          buttonLabel: 'CONTINUAR: GUARDAR SKILLS',
+          targetMenuItem: 'Actualizar Datos',
+        }
+      : !hasTestsCompleted
+        ? {
+            title: 'Ahora completa tus pruebas de evaluacion',
+            description:
+              'Finaliza pruebas psicotecnicas y tecnicas para consolidar tu assessment.',
+            buttonLabel: hasPsychotechnicalResults && !hasTechnicalResults
+              ? 'IR A PRUEBA TECNICA'
+              : hasTechnicalResults && !hasPsychotechnicalResults
+                ? 'IR A PRUEBA PSICOTECNICA'
+                : 'INICIAR PRUEBAS',
+            targetMenuItem:
+              hasPsychotechnicalResults && !hasTechnicalResults
+                ? 'Tecnica'
+                : 'Psicotecnica',
+          }
+        : {
+            title: 'Genera tu roadmap sugerido de estudio',
+            description:
+              'Con tus pruebas completas, crea la ruta recomendada para mejorar tu perfil.',
+            buttonLabel: 'GENERAR ROADMAP',
+            targetMenuItem: 'Resultados',
+          };
+
+  const handleRoadmapGenerated = (): void => {
+    window.localStorage.setItem(onboardingStorageKey, '1');
+    setOnboardingModeEnabled(false);
+
+    void Promise.all([
+      getMyLearningPaths().catch(() => []),
+      getMyAllTestResults().catch(() => []),
+    ]).then(([paths, tests]) => {
+      setLearningPaths(paths);
+      setAssessmentTestResults(tests);
+    });
+
+    setLearningRoadmapRefreshToken((currentToken) => currentToken + 1);
+    setSelectedMenuItem('Mi Ruta de Cursos');
+  };
+
+  const syncSkillsFromCv = async (data: ParsedCvDataAdvanced): Promise<void> => {
+    const existingSkills = await getMySkills();
+    const existingByName = new Map<string, UserSkill>();
+
+    existingSkills.forEach((userSkill) => {
+      const name = userSkill.skill?.name ?? '';
+      if (name) {
+        existingByName.set(normalizeSkillName(name), userSkill);
+      }
+    });
+
+    const desiredSkills = [
+      ...data.skills.technical.map((name) => ({ name, category: 'technical' })),
+      ...data.skills.personal.map((name) => ({ name, category: 'personal' })),
+    ];
+
+    for (const desiredSkill of desiredSkills) {
+      const normalizedName = normalizeSkillName(desiredSkill.name);
+      if (!normalizedName) {
+        continue;
+      }
+
+      const existing = existingByName.get(normalizedName);
+      if (existing) {
+        await updateMySkill(existing.skillId, {
+          level: toSkillLevel(),
+          source: 'cv_auto',
+        });
+        continue;
+      }
+
+      await createMySkill({
+        name: desiredSkill.name,
+        category: desiredSkill.category,
+        level: toSkillLevel(),
+        source: 'cv_auto',
+      });
+    }
+  };
+
+  const handleSaveCvForm = async () => {
+    if (!cvFormData) {
+      setSaveErrorMessage('No hay formulario para guardar. Primero carga un CV.');
+      return;
+    }
+
+    try {
+      setIsSavingCv(true);
+      setSaveErrorMessage(null);
+      setSaveSuccessMessage(null);
+
+      await createMyProfile({
+        fullName: cvFormData.profile.fullName || user.name || 'Sin nombre',
+        location: cvFormData.profile.location || undefined,
+        headline: cvFormData.profile.title || undefined,
+        professionalBio: cvFormData.profile.professionalSummary || undefined,
+        yearsExperience:
+          cvFormData.experience.length > 0 ? cvFormData.experience.length : undefined,
+      });
+
+      await syncSkillsFromCv(cvFormData);
+
+      const savedDiagnostic = await saveMyCvDiagnostic({
+        fileName: selectedCvFile?.name,
+        rawText: rawCvText || undefined,
+        summary: buildCvSummary(cvFormData),
+        profile: {
+          fullName: cvFormData.profile.fullName || undefined,
+          email: cvFormData.profile.email || undefined,
+          phone: cvFormData.profile.phone || undefined,
+          location: cvFormData.profile.location || undefined,
+          title: cvFormData.profile.title || undefined,
+          professionalSummary: cvFormData.profile.professionalSummary || undefined,
+        },
+        skills: {
+          technical: cvFormData.skills.technical,
+          personal: cvFormData.skills.personal,
+        },
+        experience: cvFormData.experience.map((experience) => ({
+          company: experience.company,
+          position: experience.position,
+          startDate: experience.startDate || undefined,
+          endDate: experience.endDate || undefined,
+          description: experience.description || undefined,
+          highlights: experience.highlights ?? [],
+        })),
+        education: cvFormData.education.map((education) => ({
+          institution: education.institution,
+          degree: education.degree,
+          details: education.details || undefined,
+          status: education.status || undefined,
+        })),
+      });
+      const refreshedSkills = await getMySkills();
+      const refreshedTests = await getMyAllTestResults().catch(() => []);
+
+      setLatestDiagnostic(savedDiagnostic);
+      setProfileSkills(refreshedSkills);
+      setAssessmentTestResults(refreshedTests);
+      setAdvancedCvData(cvFormData);
+
+      if (onboardingModeEnabled) {
+        setSaveSuccessMessage(
+          'CV y skills guardados correctamente. Ahora vamos a realizar tus pruebas psicotecnicas y tecnicas.',
+        );
+        setSelectedMenuItem('Psicotecnica');
+      } else {
+        setSaveSuccessMessage('Datos guardados correctamente en backend: perfil, skills y diagnostico inicial.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo guardar la informacion del CV.';
+      setSaveErrorMessage(message);
+    } finally {
+      setIsSavingCv(false);
+    }
+  };
 
   const updateProfileField = (field: keyof ParsedCvDataAdvanced['profile'], value: string) => {
     setCvFormData((prev) => {
@@ -417,7 +773,7 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                   Bienvenido a tu Red de Bienestar
                 </Typography>
                 <Typography variant="body1" sx={{ mt: 1, color: '#202D3D' }}>
-                  Tu perfil esta al <strong>{profileCompletion}%</strong> de completitud. Sincroniza tus cursos para destacar ante las empresas.
+                  Tu ruta inicial de talento esta al <strong>{onboardingProgressPercentage}%</strong> de completitud. Puedes hacer el flujo sugerido o navegar manualmente desde el menu.
                 </Typography>
               </Paper>
 
@@ -425,11 +781,11 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                 <Box sx={{ flex: '1 1 220px', display: 'flex' }}>
                   <Card sx={{ borderRadius: 2.5, textAlign: 'center', p: 0.5, minHeight: 150, width: '100%', display: 'flex' }}>
                     <CardContent sx={{ width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <Typography variant="body2" color="text.secondary">Evaluaciones</Typography>
+                      <Typography variant="body2" color="text.secondary">Evaluacion del Camino</Typography>
                       <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>{evaluationsCount}</Typography>
                       <LinearProgress
                         variant="determinate"
-                        value={66}
+                        value={onboardingProgressPercentage}
                         sx={{
                           mt: 1.5,
                           height: 4,
@@ -463,48 +819,54 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                 </Box>
               </Box>
 
-              <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: '0px 3px 10px rgba(11,38,69,0.08)' }}>
-                <Typography sx={{ fontSize: '2rem', fontWeight: 800, color: '#0E1726' }}>Proximo Paso Sugerido</Typography>
-                <Box sx={{ mt: 1.8, borderTop: '1px solid #D5DEEA', pt: 2.4, display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.6 }}>
-                    <Box
+              {onboardingModeEnabled && (
+                <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, boxShadow: '0px 3px 10px rgba(11,38,69,0.08)' }}>
+                  <Typography sx={{ fontSize: '2rem', fontWeight: 800, color: '#0E1726' }}>Proximo Paso Sugerido</Typography>
+                  <Box sx={{ mt: 1.8, borderTop: '1px solid #D5DEEA', pt: 2.4, display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.6 }}>
+                      <Box
+                        sx={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: '50%',
+                          bgcolor: '#E5741F',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <ErrorOutlined sx={{ color: '#fff' }} />
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: '1.55rem', fontWeight: 800, color: '#0E1726' }}>
+                          {suggestedStep.title}
+                        </Typography>
+                        <Typography sx={{ color: '#6F8098', mt: 0.5 }}>
+                          {suggestedStep.description}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Button
+                      variant="contained"
+                      onClick={() => {
+                        setOnboardingModeEnabled(true);
+                        setSelectedMenuItem(suggestedStep.targetMenuItem);
+                      }}
                       sx={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: '50%',
-                        bgcolor: '#E5741F',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        bgcolor: '#173A68',
+                        color: '#fff',
+                        px: 3.5,
+                        py: 1.3,
+                        fontWeight: 800,
+                        borderRadius: 1.5,
+                        '&:hover': { bgcolor: '#112D51' },
                       }}
                     >
-                      <ErrorOutlined sx={{ color: '#fff' }} />
-                    </Box>
-                    <Box>
-                      <Typography sx={{ fontSize: '1.75rem', fontWeight: 800, color: '#0E1726' }}>
-                        Completa tu Evaluacion Tecnica de Liderazgo
-                      </Typography>
-                      <Typography sx={{ color: '#6F8098', mt: 0.5 }}>
-                        Esto te permitira desbloquear el acceso al Marketplace de empresas Senior.
-                      </Typography>
-                    </Box>
+                      {suggestedStep.buttonLabel}
+                    </Button>
                   </Box>
-                  <Button
-                    variant="contained"
-                    sx={{
-                      bgcolor: '#173A68',
-                      color: '#fff',
-                      px: 3.5,
-                      py: 1.3,
-                      fontWeight: 800,
-                      borderRadius: 1.5,
-                      '&:hover': { bgcolor: '#112D51' },
-                    }}
-                  >
-                    INICIAR TEST
-                  </Button>
-                </Box>
-              </Paper>
+                </Paper>
+              )}
             </>
           ) : selectedMenuItem === 'Cargar Nuevo CV' ? (
             <Paper
@@ -521,6 +883,14 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
               <Typography sx={{ mt: 1.2, color: '#5C6F86', maxWidth: 720 }}>
                 Sube tu CV en formato PDF para mantener tu perfil profesional actualizado.
               </Typography>
+
+              {onboardingModeEnabled && !hasCvUploaded && (
+                <Box sx={{ mt: 2.2, p: 2, bgcolor: '#FFF3E0', borderRadius: 2, border: '1px solid #FFB74D' }}>
+                  <Typography sx={{ color: '#E65100', fontWeight: 700 }}>
+                    Necesitamos cargar tu CV para iniciar el proceso. Cuando lo guardes, avanzaras a pruebas psicotecnicas y tecnicas.
+                  </Typography>
+                </Box>
+              )}
 
               <Box
                 role="button"
@@ -1349,6 +1719,8 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                   <Box sx={{ mt: 2.5, display: 'flex', gap: 1.2, flexWrap: 'wrap' }}>
                     <Button
                       variant="contained"
+                      onClick={handleSaveCvForm}
+                      disabled={isSavingCv}
                       sx={{
                         bgcolor: '#173A68',
                         color: '#fff',
@@ -1356,7 +1728,7 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                         '&:hover': { bgcolor: '#112D51' },
                       }}
                     >
-                      GUARDAR CAMBIOS
+                      {isSavingCv ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}
                     </Button>
                     <Button
                       variant="outlined"
@@ -1371,6 +1743,18 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                       DESCARTAR
                     </Button>
                   </Box>
+
+                  {saveSuccessMessage && (
+                    <Typography sx={{ mt: 1.5, color: '#166534', fontWeight: 600 }}>
+                      {saveSuccessMessage}
+                    </Typography>
+                  )}
+
+                  {saveErrorMessage && (
+                    <Typography sx={{ mt: 1.5, color: '#B42318', fontWeight: 600 }}>
+                      {saveErrorMessage}
+                    </Typography>
+                  )}
                 </Box>
               ) : (
                 <Box sx={{ mt: 3, p: 2, bgcolor: '#FFF3E0', borderRadius: 2, border: '1px solid #FFB74D' }}>
@@ -1380,6 +1764,32 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                 </Box>
               )}
             </Paper>
+          ) : selectedMenuItem === 'Tecnica' ? (
+            <AssessmentTestsPanel activeTab="Tecnica" />
+          ) : selectedMenuItem === 'Psicotecnica' ? (
+            <AssessmentTestsPanel activeTab="Psicotecnica" />
+          ) : selectedMenuItem === 'Resultados' && openSections['EVALUACION PERFIL'] ? (
+            <AssessmentResultsPanel onRoadmapGenerated={handleRoadmapGenerated} />
+          ) : selectedMenuItem === 'Mi Ruta de Cursos' ? (
+            <LearningRoadmapPanel
+              mode="all"
+              refreshToken={learningRoadmapRefreshToken}
+            />
+          ) : selectedMenuItem === 'Pendientes' ? (
+            <LearningRoadmapPanel
+              mode="pending"
+              refreshToken={learningRoadmapRefreshToken}
+            />
+          ) : selectedMenuItem === 'En Ejecucion' ? (
+            <LearningRoadmapPanel
+              mode="in-progress"
+              refreshToken={learningRoadmapRefreshToken}
+            />
+          ) : selectedMenuItem === 'Resultados (Diplomas)' ? (
+            <LearningRoadmapPanel
+              mode="completed"
+              refreshToken={learningRoadmapRefreshToken}
+            />
           ) : selectedMenuItem === 'Editar Skills' ? (
             <Paper
               sx={{
@@ -1496,11 +1906,196 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                       )}
                     </Box>
                   </Box>
+
+                  <Box sx={{ mt: 3, p: 2.5, borderRadius: 2, border: '1px solid #D8E3F0', bgcolor: '#FFFFFF' }}>
+                    <Typography sx={{ fontWeight: 800, color: '#1F3E69', mb: 1.5, fontSize: '1rem' }}>
+                      Skills guardadas en backend
+                    </Typography>
+                    {isLoadingProfileSkills ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CircularProgress size={18} />
+                        <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>Cargando skills...</Typography>
+                      </Box>
+                    ) : profileSkills.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.9 }}>
+                        {profileSkills.map((userSkill) => {
+                          const isPersonal =
+                            userSkill.skill?.category?.toLowerCase().includes('personal') ?? false;
+                          return (
+                            <Chip
+                              key={`db-skill-${userSkill.id}`}
+                              label={`${userSkill.skill?.name ?? 'Skill'} (${userSkill.level})`}
+                              sx={{
+                                bgcolor: isPersonal ? '#F3E5F5' : '#E3F2FD',
+                                color: isPersonal ? '#6A1B9A' : '#1565C0',
+                                fontWeight: 600,
+                              }}
+                            />
+                          );
+                        })}
+                      </Box>
+                    ) : (
+                      <Typography sx={{ color: '#6E819A', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                        Aun no hay skills persistidas en backend.
+                      </Typography>
+                    )}
+                  </Box>
                 </Box>
               ) : (
                 <Box sx={{ mt: 3, p: 2, bgcolor: '#FFF3E0', borderRadius: 2, border: '1px solid #FFB74D' }}>
                   <Typography sx={{ color: '#E65100', fontWeight: 600 }}>
                     ℹ️ No hay datos de CV disponibles. Por favor, carga un CV primero en la sección "Cargar Nuevo CV".
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          ) : selectedMenuItem === 'Ver Informe de Skills' || selectedMenuItem === 'Resultados' ? (
+            <Paper
+              sx={{
+                p: { xs: 3, md: 5 },
+                borderRadius: 3,
+                boxShadow: '0px 3px 10px rgba(11,38,69,0.08)',
+              }}
+            >
+              <Typography sx={{ fontSize: { xs: '1.5rem', md: '2rem' }, fontWeight: 800, color: '#1F3E69' }}>
+                Informe Inicial del Perfil
+              </Typography>
+              <Typography sx={{ mt: 1.2, color: '#5C6F86', maxWidth: 820 }}>
+                Este informe resume el diagnóstico inicial obtenido desde tu CV. Incluye skills técnicas/personales y una métrica de completitud para orientar el plan de mejora.
+              </Typography>
+
+              {isLoadingDiagnostic ? (
+                <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                  <CircularProgress size={22} />
+                  <Typography sx={{ color: '#1F3E69', fontWeight: 600 }}>Cargando diagnóstico...</Typography>
+                </Box>
+              ) : latestDiagnostic ? (
+                <Box sx={{ mt: 3, display: 'grid', gap: 2 }}>
+                  <Card sx={{ border: '1px solid #D8E3F0' }}>
+                    <CardContent>
+                      <Typography sx={{ fontWeight: 800, color: '#1F3E69' }}>Resumen del diagnóstico</Typography>
+                      <Typography sx={{ mt: 1, color: '#2B3F5E' }}>
+                        {latestDiagnostic.summary || 'Diagnóstico guardado sin resumen textual.'}
+                      </Typography>
+                      <Typography sx={{ mt: 1, color: '#5C6F86', fontSize: '0.9rem' }}>
+                        Fecha: {new Date(latestDiagnostic.createdAt).toLocaleString()}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
+                    <Card sx={{ border: '1px solid #D8E3F0' }}>
+                      <CardContent>
+                        <Typography color="text.secondary">Skills técnicas</Typography>
+                        <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#1565C0' }}>
+                          {latestDiagnostic.technicalSkills.length}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card sx={{ border: '1px solid #D8E3F0' }}>
+                      <CardContent>
+                        <Typography color="text.secondary">Skills personales</Typography>
+                        <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#6A1B9A' }}>
+                          {latestDiagnostic.personalSkills.length}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card sx={{ border: '1px solid #D8E3F0' }}>
+                      <CardContent>
+                        <Typography color="text.secondary">Texto CV procesado</Typography>
+                        <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>
+                          {latestDiagnostic.extractedTextLength}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Box>
+
+                  <Card sx={{ border: '1px solid #D8E3F0' }}>
+                    <CardContent>
+                      <Typography sx={{ fontWeight: 800, color: '#1F3E69', mb: 2 }}>Distribución de skills</Typography>
+                      {(() => {
+                        const total =
+                          latestDiagnostic.technicalSkills.length + latestDiagnostic.personalSkills.length;
+                        const technicalPct = total > 0
+                          ? Math.round((latestDiagnostic.technicalSkills.length / total) * 100)
+                          : 0;
+                        const personalPct = total > 0 ? 100 - technicalPct : 0;
+                        return (
+                          <>
+                            <Typography sx={{ color: '#1565C0', fontWeight: 700 }}>
+                              Técnicas: {technicalPct}%
+                            </Typography>
+                            <LinearProgress
+                              variant="determinate"
+                              value={technicalPct}
+                              sx={{
+                                mt: 0.7,
+                                height: 9,
+                                borderRadius: 8,
+                                bgcolor: '#E1E8F0',
+                                '& .MuiLinearProgress-bar': { bgcolor: '#1565C0' },
+                              }}
+                            />
+                            <Typography sx={{ mt: 2, color: '#6A1B9A', fontWeight: 700 }}>
+                              Personales: {personalPct}%
+                            </Typography>
+                            <LinearProgress
+                              variant="determinate"
+                              value={personalPct}
+                              sx={{
+                                mt: 0.7,
+                                height: 9,
+                                borderRadius: 8,
+                                bgcolor: '#E1E8F0',
+                                '& .MuiLinearProgress-bar': { bgcolor: '#6A1B9A' },
+                              }}
+                            />
+                          </>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
+
+                  <Card sx={{ border: '1px solid #D8E3F0' }}>
+                    <CardContent>
+                      <Typography sx={{ fontWeight: 800, color: '#1F3E69', mb: 2 }}>
+                        Skills persistidas en backend
+                      </Typography>
+                      {isLoadingProfileSkills ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CircularProgress size={18} />
+                          <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>Cargando skills...</Typography>
+                        </Box>
+                      ) : profileSkills.length > 0 ? (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.9 }}>
+                          {profileSkills.map((userSkill) => {
+                            const isPersonal =
+                              userSkill.skill?.category?.toLowerCase().includes('personal') ?? false;
+                            return (
+                              <Chip
+                                key={`report-db-skill-${userSkill.id}`}
+                                label={`${userSkill.skill?.name ?? 'Skill'} (${userSkill.level})`}
+                                sx={{
+                                  bgcolor: isPersonal ? '#F3E5F5' : '#E3F2FD',
+                                  color: isPersonal ? '#6A1B9A' : '#1565C0',
+                                  fontWeight: 600,
+                                }}
+                              />
+                            );
+                          })}
+                        </Box>
+                      ) : (
+                        <Typography sx={{ color: '#6E819A', fontSize: '0.95rem' }}>
+                          No hay skills guardadas en backend para mostrar.
+                        </Typography>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Box>
+              ) : (
+                <Box sx={{ mt: 3, p: 2, bgcolor: '#FFF3E0', borderRadius: 2, border: '1px solid #FFB74D' }}>
+                  <Typography sx={{ color: '#E65100', fontWeight: 600 }}>
+                    No hay diagnóstico guardado todavía. Carga un CV y usa Guardar Cambios para generar el informe.
                   </Typography>
                 </Box>
               )}

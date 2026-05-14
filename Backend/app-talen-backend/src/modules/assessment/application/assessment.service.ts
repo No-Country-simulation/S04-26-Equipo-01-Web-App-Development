@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -10,6 +10,8 @@ import { AiAssessmentService } from '../../ai/application/ai-assessment.service'
 import { AuthTokenPayload } from '../../auth/domain/auth-token-payload.type';
 import { Profile } from '../../profiles/infrastructure/entities/profile.entity';
 import { UserRole } from '../../users/domain/user-role.enum';
+import { UserSkill } from '../../skills/infrastructure/entities/user-skill.entity';
+import { AssessmentLevel } from '../domain/assessment-level.enum';
 import { AssessmentTestQuestion } from '../domain/assessment-test-question.type';
 import { AssessmentTestResult } from '../domain/assessment-test-result.enum';
 import { AssessmentTestType } from '../domain/assessment-test-type.enum';
@@ -19,6 +21,10 @@ import {
 } from './assessment-test-question-bank';
 import { CreateAssessmentTestDto } from './dto/create-assessment-test.dto';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
+import {
+  GeneratedTest,
+  GeneratedTestsResponseDto,
+} from './dto/generated-tests-response.dto';
 import { SubmitAssessmentTestDto } from './dto/submit-assessment-test.dto';
 import { AssessmentTestResultEntity } from '../infrastructure/entities/assessment-test-result.entity';
 import { Assessment } from '../infrastructure/entities/assessment.entity';
@@ -32,6 +38,8 @@ export class AssessmentService {
     private readonly assessmentTestResultsRepository: Repository<AssessmentTestResultEntity>,
     @InjectRepository(Profile)
     private readonly profilesRepository: Repository<Profile>,
+    @InjectRepository(UserSkill)
+    private readonly userSkillsRepository: Repository<UserSkill>,
     private readonly aiAssessmentService: AiAssessmentService,
   ) {}
 
@@ -166,6 +174,103 @@ export class AssessmentService {
     return [psychotechnical, technical].filter(
       (result): result is AssessmentTestResultEntity => Boolean(result),
     );
+  }
+
+  async consolidateMyAssessment(authUser: AuthTokenPayload): Promise<Assessment> {
+    const testResults = await this.findMyTestResults(authUser);
+
+    if (testResults.length === 0) {
+      throw new BadRequestException(
+        'No test results found. Complete at least one psychotechnical and one technical test first.',
+      );
+    }
+
+    const psychotechnicalResults = testResults.filter(
+      (result) => result.type === AssessmentTestType.PSYCHOTECHNICAL,
+    );
+    const technicalResults = testResults.filter(
+      (result) => result.type === AssessmentTestType.TECHNICAL,
+    );
+
+    if (psychotechnicalResults.length === 0 || technicalResults.length === 0) {
+      throw new BadRequestException(
+        'Consolidated assessment requires at least one psychotechnical test and one technical test result.',
+      );
+    }
+
+    const psychotechnicalAverage = this.calculateAveragePercentage(
+      psychotechnicalResults,
+    );
+    const technicalAverage = this.calculateAveragePercentage(technicalResults);
+
+    return this.createMe(authUser, {
+      digitalLevel: this.mapPercentageToAssessmentLevel(technicalAverage),
+      cognitiveLevel: this.mapPercentageToAssessmentLevel(psychotechnicalAverage),
+      socioEmotionalLevel: this.mapPercentageToAssessmentLevel(
+        psychotechnicalAverage,
+      ),
+      careerGoal: 'Mejorar el perfil profesional con base en resultados de pruebas.',
+      answers: {
+        source: 'assessment_test_results',
+        generatedAt: new Date().toISOString(),
+        totals: {
+          tests: testResults.length,
+          psychotechnical: psychotechnicalResults.length,
+          technical: technicalResults.length,
+        },
+        averages: {
+          psychotechnical: psychotechnicalAverage,
+          technical: technicalAverage,
+        },
+        testResults: testResults.map((result) => ({
+          id: result.id,
+          title: result.title,
+          type: result.type,
+          percentage: result.percentage,
+          result: result.result,
+          feedback: result.feedback,
+          createdAt: result.createdAt,
+        })),
+      },
+    });
+  }
+
+  async generateTestsForProfile(
+    authUser: AuthTokenPayload,
+  ): Promise<GeneratedTestsResponseDto> {
+    const profile = await this.findTalentProfile(authUser);
+
+    // Obtener skills tecnicas del usuario
+    const userSkills = await this.userSkillsRepository.find({
+      where: { profileId: profile.id },
+      relations: ['skill'],
+    });
+
+    const technicalSkills = userSkills.filter(
+      (us) =>
+        us.skill?.category &&
+        us.skill.category.toLowerCase().includes('tecnic'),
+    );
+
+    // Generar tests
+    const psychotechnicalTests = this.generatePsychotechnicalTests();
+    const technicalTests = this.generateTechnicalTestsFromSkills(technicalSkills);
+
+    // Contar total de preguntas
+    const totalQuestionsCount =
+      psychotechnicalTests.reduce((sum, t) => sum + t.questionCount, 0) +
+      technicalTests.reduce((sum, t) => sum + t.questionCount, 0);
+
+    return {
+      psychotechnicalTests,
+      technicalTests,
+      totalTests: psychotechnicalTests.length + technicalTests.length,
+      profile: {
+        fullName: profile.fullName ?? 'Sin nombre',
+        technicalSkillsCount: technicalSkills.length,
+        totalQuestionsCount,
+      },
+    };
   }
 
   private async createMyTestResult(
@@ -309,6 +414,31 @@ export class AssessmentService {
     return AssessmentTestResult.LOW;
   }
 
+  private calculateAveragePercentage(
+    results: AssessmentTestResultEntity[],
+  ): number {
+    if (results.length === 0) {
+      return 0;
+    }
+
+    const total = results.reduce((sum, result) => sum + result.percentage, 0);
+    return Math.round(total / results.length);
+  }
+
+  private mapPercentageToAssessmentLevel(
+    percentage: number,
+  ): AssessmentLevel {
+    if (percentage >= 75) {
+      return AssessmentLevel.ADVANCED;
+    }
+
+    if (percentage >= 50) {
+      return AssessmentLevel.INTERMEDIATE;
+    }
+
+    return AssessmentLevel.BASIC;
+  }
+
   private async findTalentProfile(
     authUser: AuthTokenPayload,
   ): Promise<Profile> {
@@ -325,5 +455,73 @@ export class AssessmentService {
     }
 
     return profile;
+  }
+
+  private generatePsychotechnicalTests(): GeneratedTest[] {
+    // Crear 1 test psicotecnico con todas las preguntas
+    const questions = this.selectQuestionsForTest(
+      this.getPublicQuestions(AssessmentTestType.PSYCHOTECHNICAL),
+      5,
+      20,
+    );
+
+    return [
+      {
+        id: 'psycho_test_1',
+        name: 'Test Psicotecnico - Aptitud General',
+        description:
+          'Evaluacion de razonamiento logico, atencion, toma de decisiones y trabajo en equipo.',
+        type: AssessmentTestType.PSYCHOTECHNICAL,
+        questionCount: questions.length,
+        estimatedDurationMin: questions.length * 2,
+        questions,
+      },
+    ];
+  }
+
+  private generateTechnicalTestsFromSkills(
+    technicalSkills: UserSkill[],
+  ): GeneratedTest[] {
+    return technicalSkills.map((userSkill, index) => {
+      const skillName = userSkill.skill?.name ?? `Skill ${index + 1}`;
+
+      // Filtrar preguntas tecnicas que podrian relacionarse con la skill
+      const allTechnicalQuestions = this.getPublicQuestions(
+        AssessmentTestType.TECHNICAL,
+      );
+
+      const selectedQuestions = this.selectQuestionsForTest(
+        allTechnicalQuestions,
+        5,
+        20,
+      );
+
+      return {
+        id: `tech_test_skill_${userSkill.id}`,
+        name: `Test Tecnico - ${skillName}`,
+        description: `Evaluacion de conocimientos tecnicos en ${skillName}. Incluye conceptos fundamentales y aplicaciones practicas.`,
+        type: AssessmentTestType.TECHNICAL,
+        skillName,
+        questionCount: selectedQuestions.length,
+        estimatedDurationMin: selectedQuestions.length * 3,
+        questions: selectedQuestions,
+      };
+    });
+  }
+
+  private selectQuestionsForTest(
+    questions: AssessmentTestQuestion[],
+    minQuestions: number = 5,
+    maxQuestions: number = 20,
+  ): AssessmentTestQuestion[] {
+    // Seleccionar numero aleatorio entre min y max
+    const count = Math.max(
+      minQuestions,
+      Math.min(maxQuestions, questions.length),
+    );
+
+    // Shuffear y seleccionar
+    const shuffled = [...questions].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, count);
   }
 }

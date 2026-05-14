@@ -6,4 +6,5 @@ export type CvAnalysisResponse = AiCvAnalysis & {
   extractedTextLength: number;
   appliedFields: string[];
   updatedProfile?: Profile;
+  diagnosticId?: string;
 };
