@@ -66,8 +66,9 @@ export class CoursesController {
 
   @Get()
   @ApiOperation({
-    summary: 'Listar todos los cursos',
-    description: 'Obtiene todos los cursos, opcionalmente solo publicados',
+    summary: 'Listar cursos',
+    description:
+      'Obtiene cursos. Los usuarios TALENT solo verán cursos en estado published; otros roles pueden ver más según permisos. Use ?published=true para filtrar publicados.',
   })
   @ApiQuery({
     name: 'published',
@@ -80,8 +81,11 @@ export class CoursesController {
     description: 'Lista de cursos',
     type: [Course],
   })
-  findAllCourses(@Query('published') published?: boolean): Promise<Course[]> {
-    return this.coursesService.findAllCourses(published ?? false);
+  findAllCourses(
+    @Req() request: AuthenticatedRequest,
+    @Query('published') published?: boolean,
+  ): Promise<Course[]> {
+    return this.coursesService.findAllCourses(request.user, published ?? false);
   }
 
   @Get('company/me')

@@ -109,23 +109,44 @@ export class CoursesService {
     return course;
   }
 
-  async findAllCourses(published: boolean = false): Promise<Course[]> {
-    const where = published ? { status: CourseStatus.PUBLISHED } : {};
 
-    return this.coursesRepository.find({
-      where,
-      relations: {
-        modules: true,
-        meetingLinks: true,
-      },
-      order: {
-        createdAt: 'DESC',
-        modules: {
-          order: 'ASC',
+    async findAllCourses(
+      authUser: AuthTokenPayload,
+      published: boolean = false,
+    ): Promise<Course[]> {
+      // If the caller is a TALENT user, only return published courses
+      if (authUser.role === UserRole.TALENT) {
+        return this.coursesRepository.find({
+          where: { status: CourseStatus.PUBLISHED },
+          relations: {
+            modules: true,
+            meetingLinks: true,
+          },
+          order: {
+            createdAt: 'DESC',
+            modules: {
+              order: 'ASC',
+            },
+          },
+        });
+      }
+
+      const where = published ? { status: CourseStatus.PUBLISHED } : {};
+
+      return this.coursesRepository.find({
+        where,
+        relations: {
+          modules: true,
+          meetingLinks: true,
         },
-      },
-    });
-  }
+        order: {
+          createdAt: 'DESC',
+          modules: {
+            order: 'ASC',
+          },
+        },
+      });
+    }
 
   async updateCourse(
     authUser: AuthTokenPayload,
