@@ -109,9 +109,10 @@ export class CoursesController {
   @ApiParam({ name: 'courseId', description: 'ID del curso' })
   @ApiResponse({ status: 200, description: 'Curso encontrado', type: Course })
   findCourseById(
+    @Req() request: AuthenticatedRequest,
     @Param('courseId', UUID_V4_PARAM_PIPE) courseId: string,
   ): Promise<Course> {
-    return this.coursesService.findCourseById(courseId);
+    return this.coursesService.findCourseById(courseId, request.user);
   }
 
   @Patch(':courseId')

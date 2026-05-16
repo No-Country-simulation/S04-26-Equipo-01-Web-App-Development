@@ -75,7 +75,7 @@ export class CoursesService {
       throw new ForbiddenException('Only ADMIN can approve courses');
     }
 
-    const course = await this.findCourseById(courseId);
+    const course = await this.findCourseById(courseId, authUser);
 
     if (course.status !== CourseStatus.PENDING_REVIEW) {
       throw new BadRequestException(
@@ -88,7 +88,10 @@ export class CoursesService {
     return this.coursesRepository.save(course);
   }
 
-  async findCourseById(courseId: string): Promise<Course> {
+  async findCourseById(
+    courseId: string,
+    authUser?: AuthTokenPayload,
+  ): Promise<Course> {
     const course = await this.coursesRepository.findOne({
       where: { id: courseId },
       relations: {
@@ -106,6 +109,22 @@ export class CoursesService {
       throw new NotFoundException('Course not found');
     }
 
+    // If authUser provided, enforce visibility rules
+    if (authUser) {
+      if (authUser.role === UserRole.TALENT) {
+        if (course.status !== CourseStatus.PUBLISHED) {
+          throw new NotFoundException('Course not found');
+        }
+      } else if (authUser.role === UserRole.COMPANY) {
+        const isCompanyOwner = course.companyId && course.companyId === authUser.userId;
+        const isCreator = course.createdBy === authUser.userId;
+        if (!isCompanyOwner && !isCreator) {
+          throw new NotFoundException('Course not found');
+        }
+      }
+      // ADMIN can see any course
+    }
+
     return course;
   }
 
@@ -114,7 +133,7 @@ export class CoursesService {
       authUser: AuthTokenPayload,
       published: boolean = false,
     ): Promise<Course[]> {
-      // If the caller is a TALENT user, only return published courses
+      // TALENT: only published
       if (authUser.role === UserRole.TALENT) {
         return this.coursesRepository.find({
           where: { status: CourseStatus.PUBLISHED },
@@ -131,6 +150,28 @@ export class CoursesService {
         });
       }
 
+      // COMPANY: only courses created by the company (filter by companyId)
+      if (authUser.role === UserRole.COMPANY) {
+        const where = published
+          ? { companyId: authUser.userId, status: CourseStatus.PUBLISHED }
+          : { companyId: authUser.userId };
+
+        return this.coursesRepository.find({
+          where,
+          relations: {
+            modules: true,
+            meetingLinks: true,
+          },
+          order: {
+            createdAt: 'DESC',
+            modules: {
+              order: 'ASC',
+            },
+          },
+        });
+      }
+
+      // ADMIN or others: respect `published` filter or return all
       const where = published ? { status: CourseStatus.PUBLISHED } : {};
 
       return this.coursesRepository.find({
@@ -153,7 +194,7 @@ export class CoursesService {
     courseId: string,
     updateCourseDto: UpdateCourseDto,
   ): Promise<Course> {
-    const course = await this.findCourseById(courseId);
+    const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
     // Prevent COMPANY from setting status to PUBLISHED directly and require PENDING_REVIEW for publication requests
@@ -192,7 +233,7 @@ export class CoursesService {
     authUser: AuthTokenPayload,
     courseId: string,
   ): Promise<void> {
-    const course = await this.findCourseById(courseId);
+    const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
     await this.coursesRepository.remove(course);
@@ -203,7 +244,7 @@ export class CoursesService {
     courseId: string,
     createCourseModuleDto: CreateCourseModuleDto,
   ): Promise<CourseModule> {
-    const course = await this.findCourseById(courseId);
+    const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
     const module = this.courseModulesRepository.create({
@@ -225,7 +266,7 @@ export class CoursesService {
     moduleId: string,
     updateCourseModuleDto: UpdateCourseModuleDto,
   ): Promise<CourseModule> {
-    const course = await this.findCourseById(courseId);
+    const course = await this.findCourseById(courseId, authUser);
     this.validateCourseCreator(authUser, course);
 
     const module = await this.courseModulesRepository.findOne({
@@ -263,7 +304,7 @@ export class CoursesService {
     courseId: string,
     moduleId: string,
   ): Promise<void> {
-    const course = await this.findCourseById(courseId);
+    const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
     const module = await this.courseModulesRepository.findOne({
@@ -282,7 +323,7 @@ export class CoursesService {
     courseId: string,
     addMeetingLinkDto: AddMeetingLinkDto,
   ): Promise<MeetingLink> {
-    const course = await this.findCourseById(courseId);
+    const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
     const meetingLink = this.meetingLinksRepository.create({
@@ -302,7 +343,7 @@ export class CoursesService {
     courseId: string,
     meetingLinkId: string,
   ): Promise<void> {
-    const course = await this.findCourseById(courseId);
+    const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
     const meetingLink = await this.meetingLinksRepository.findOne({
