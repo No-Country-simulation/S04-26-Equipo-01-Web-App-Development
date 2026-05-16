@@ -23,7 +23,14 @@ import { UploadedCvFile } from '../domain/uploaded-cv-file.type';
 import { ProfilesService } from '../application/profiles.service';
 import { CvDiagnostic } from './entities/cv-diagnostic.entity';
 import { Profile } from './entities/profile.entity';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 @ApiTags('Perfiles')
 @ApiBearerAuth()
@@ -32,11 +39,21 @@ import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags
 export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
 
-
   @Post('me')
-  @ApiOperation({ summary: 'Crear mi perfil', description: 'Crea un nuevo perfil para el usuario autenticado. Útil para el registro inicial.' })
-  @ApiBody({ type: CreateProfileDto, description: 'Datos necesarios para crear el perfil.' })
-  @ApiResponse({ status: 201, description: 'Perfil creado exitosamente.', type: Profile })
+  @ApiOperation({
+    summary: 'Crear mi perfil',
+    description:
+      'Crea un nuevo perfil para el usuario autenticado. Útil para el registro inicial.',
+  })
+  @ApiBody({
+    type: CreateProfileDto,
+    description: 'Datos necesarios para crear el perfil.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Perfil creado exitosamente.',
+    type: Profile,
+  })
   createMe(
     @Req() request: AuthenticatedRequest,
     @Body() createProfileDto: CreateProfileDto,
@@ -44,19 +61,35 @@ export class ProfilesController {
     return this.profilesService.createMe(request.user, createProfileDto);
   }
 
-
   @Get('me')
-  @ApiOperation({ summary: 'Obtener mi perfil', description: 'Devuelve la información del perfil del usuario autenticado.' })
-  @ApiResponse({ status: 200, description: 'Perfil encontrado.', type: Profile })
+  @ApiOperation({
+    summary: 'Obtener mi perfil',
+    description: 'Devuelve la información del perfil del usuario autenticado.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Perfil encontrado.',
+    type: Profile,
+  })
   getMe(@Req() request: AuthenticatedRequest): Promise<Profile> {
     return this.profilesService.getMe(request.user);
   }
 
-
   @Patch('me')
-  @ApiOperation({ summary: 'Actualizar mi perfil', description: 'Permite modificar los datos del perfil del usuario autenticado.' })
-  @ApiBody({ type: UpdateProfileDto, description: 'Datos a actualizar en el perfil.' })
-  @ApiResponse({ status: 200, description: 'Perfil actualizado.', type: Profile })
+  @ApiOperation({
+    summary: 'Actualizar mi perfil',
+    description:
+      'Permite modificar los datos del perfil del usuario autenticado.',
+  })
+  @ApiBody({
+    type: UpdateProfileDto,
+    description: 'Datos a actualizar en el perfil.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Perfil actualizado.',
+    type: Profile,
+  })
   updateMe(
     @Req() request: AuthenticatedRequest,
     @Body() updateProfileDto: UpdateProfileDto,
@@ -64,11 +97,21 @@ export class ProfilesController {
     return this.profilesService.updateMe(request.user, updateProfileDto);
   }
 
-
   @Patch('me/preferences')
-  @ApiOperation({ summary: 'Actualizar mis preferencias laborales', description: 'Actualiza las preferencias de trabajo del usuario (país, modalidad, etc.).' })
-  @ApiBody({ type: UpdateWorkPreferencesDto, description: 'Preferencias laborales a actualizar.' })
-  @ApiResponse({ status: 200, description: 'Preferencias actualizadas.', type: Profile })
+  @ApiOperation({
+    summary: 'Actualizar mis preferencias laborales',
+    description:
+      'Actualiza las preferencias de trabajo del usuario (país, modalidad, etc.).',
+  })
+  @ApiBody({
+    type: UpdateWorkPreferencesDto,
+    description: 'Preferencias laborales a actualizar.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Preferencias actualizadas.',
+    type: Profile,
+  })
   updateMyWorkPreferences(
     @Req() request: AuthenticatedRequest,
     @Body() updateWorkPreferencesDto: UpdateWorkPreferencesDto,
@@ -79,11 +122,21 @@ export class ProfilesController {
     );
   }
 
-
   @Patch('me/interested-roles')
-  @ApiOperation({ summary: 'Actualizar roles de interés', description: 'Permite definir o modificar los roles laborales de interés del usuario.' })
-  @ApiBody({ type: UpdateInterestedRolesDto, description: 'Lista de roles de interés.' })
-  @ApiResponse({ status: 200, description: 'Roles de interés actualizados.', type: Profile })
+  @ApiOperation({
+    summary: 'Actualizar roles de interés',
+    description:
+      'Permite definir o modificar los roles laborales de interés del usuario.',
+  })
+  @ApiBody({
+    type: UpdateInterestedRolesDto,
+    description: 'Lista de roles de interés.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Roles de interés actualizados.',
+    type: Profile,
+  })
   updateMyInterestedRoles(
     @Req() request: AuthenticatedRequest,
     @Body() updateInterestedRolesDto: UpdateInterestedRolesDto,
@@ -94,10 +147,17 @@ export class ProfilesController {
     );
   }
 
-
   @Patch('me/employability-score')
-  @ApiOperation({ summary: 'Recalcular mi puntaje de empleabilidad', description: 'Recalcula el puntaje de empleabilidad del usuario según los datos actuales.' })
-  @ApiResponse({ status: 200, description: 'Puntaje recalculado.', type: Profile })
+  @ApiOperation({
+    summary: 'Recalcular mi puntaje de empleabilidad',
+    description:
+      'Recalcula el puntaje de empleabilidad del usuario según los datos actuales.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Puntaje recalculado.',
+    type: Profile,
+  })
   recalculateMyEmployabilityScore(
     @Req() request: AuthenticatedRequest,
   ): Promise<Profile> {
@@ -105,7 +165,11 @@ export class ProfilesController {
   }
 
   @Post('me/cv/analyze')
-  @ApiOperation({ summary: 'Analizar mi CV con IA', description: 'Sube y analiza tu currículum (CV) usando inteligencia artificial para extraer información relevante y sugerir mejoras.' })
+  @ApiOperation({
+    summary: 'Analizar mi CV con IA',
+    description:
+      'Sube y analiza tu currículum (CV) usando inteligencia artificial para extraer información relevante y sugerir mejoras.',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'Archivo PDF del CV y opciones de análisis.',
@@ -123,12 +187,17 @@ export class ProfilesController {
         },
         applyToProfile: {
           type: 'boolean',
-          description: 'Si es true, aplica los datos sugeridos al perfil automáticamente.',
+          description:
+            'Si es true, aplica los datos sugeridos al perfil automáticamente.',
         },
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'Análisis exitoso. Devuelve sugerencias y datos extraídos.', type: Object })
+  @ApiResponse({
+    status: 201,
+    description: 'Análisis exitoso. Devuelve sugerencias y datos extraídos.',
+    type: Object,
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {
@@ -145,9 +214,20 @@ export class ProfilesController {
   }
 
   @Post('me/cv/diagnostics')
-  @ApiOperation({ summary: 'Guardar diagnóstico inicial de CV', description: 'Guarda el resultado del CV parseado en frontend (perfil, skills técnicas/personales y resumen inicial).' })
-  @ApiBody({ type: SaveCvDiagnosticDto, description: 'Datos del diagnóstico inicial del CV.' })
-  @ApiResponse({ status: 201, description: 'Diagnóstico guardado exitosamente.', type: CvDiagnostic })
+  @ApiOperation({
+    summary: 'Guardar diagnóstico inicial de CV',
+    description:
+      'Guarda el resultado del CV parseado en frontend (perfil, skills técnicas/personales y resumen inicial).',
+  })
+  @ApiBody({
+    type: SaveCvDiagnosticDto,
+    description: 'Datos del diagnóstico inicial del CV.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Diagnóstico guardado exitosamente.',
+    type: CvDiagnostic,
+  })
   saveMyCvDiagnostic(
     @Req() request: AuthenticatedRequest,
     @Body() saveCvDiagnosticDto: SaveCvDiagnosticDto,
@@ -159,8 +239,16 @@ export class ProfilesController {
   }
 
   @Get('me/cv/diagnostics')
-  @ApiOperation({ summary: 'Listar historial de diagnósticos de CV', description: 'Devuelve todos los diagnósticos de CV del usuario autenticado, del más reciente al más antiguo.' })
-  @ApiResponse({ status: 200, description: 'Historial de diagnósticos obtenido.', type: [CvDiagnostic] })
+  @ApiOperation({
+    summary: 'Listar historial de diagnósticos de CV',
+    description:
+      'Devuelve todos los diagnósticos de CV del usuario autenticado, del más reciente al más antiguo.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Historial de diagnósticos obtenido.',
+    type: [CvDiagnostic],
+  })
   findMyCvDiagnostics(
     @Req() request: AuthenticatedRequest,
   ): Promise<CvDiagnostic[]> {
@@ -168,8 +256,16 @@ export class ProfilesController {
   }
 
   @Get('me/cv/diagnostics/latest')
-  @ApiOperation({ summary: 'Obtener último diagnóstico de CV', description: 'Devuelve el diagnóstico de CV más reciente del usuario autenticado.' })
-  @ApiResponse({ status: 200, description: 'Último diagnóstico obtenido.', type: CvDiagnostic })
+  @ApiOperation({
+    summary: 'Obtener último diagnóstico de CV',
+    description:
+      'Devuelve el diagnóstico de CV más reciente del usuario autenticado.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Último diagnóstico obtenido.',
+    type: CvDiagnostic,
+  })
   findMyLatestCvDiagnostic(
     @Req() request: AuthenticatedRequest,
   ): Promise<CvDiagnostic> {

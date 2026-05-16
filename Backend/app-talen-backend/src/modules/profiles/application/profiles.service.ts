@@ -224,7 +224,9 @@ export class ProfilesService {
     return this.cvDiagnosticsRepository.save(diagnostic);
   }
 
-  async findMyCvDiagnostics(authUser: AuthTokenPayload): Promise<CvDiagnostic[]> {
+  async findMyCvDiagnostics(
+    authUser: AuthTokenPayload,
+  ): Promise<CvDiagnostic[]> {
     this.ensureTalent(authUser);
 
     const profile = await this.findMyProfile(authUser.userId);

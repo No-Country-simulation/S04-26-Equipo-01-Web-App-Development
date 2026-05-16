@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuthTokenPayload } from '../../auth/domain/auth-token-payload.type';
@@ -51,7 +55,10 @@ export class SkillsService {
       existingUserSkill.evidence = createUserSkillDto.evidence;
       existingUserSkill.source = createUserSkillDto.source;
       await this.userSkillsRepository.save(existingUserSkill);
-      return this.findMyUserSkillBySkillId(profile.id, existingUserSkill.skillId);
+      return this.findMyUserSkillBySkillId(
+        profile.id,
+        existingUserSkill.skillId,
+      );
     }
 
     const userSkill = this.userSkillsRepository.create({
