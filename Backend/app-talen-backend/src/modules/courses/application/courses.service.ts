@@ -7,7 +7,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuthTokenPayload } from '../../auth/domain/auth-token-payload.type';
-import { Company } from '../../companies/infrastructure/entities/company.entity';
 import { UserRole } from '../../users/domain/user-role.enum';
 import { CourseStatus } from '../domain/course-status.enum';
 import { CreateCourseDto } from './dto/create-course.dto';
@@ -28,15 +27,13 @@ export class CoursesService {
     private readonly courseModulesRepository: Repository<CourseModule>,
     @InjectRepository(MeetingLink)
     private readonly meetingLinksRepository: Repository<MeetingLink>,
-    @InjectRepository(Company)
-    private readonly companiesRepository: Repository<Company>,
   ) {}
 
   async createCourse(
     authUser: AuthTokenPayload,
     createCourseDto: CreateCourseDto,
   ): Promise<Course> {
-    this.validateAdminOrCompanyRole(authUser);
+    this.validateManagementAccess(authUser);
     // Companies cannot publish directly; only ADMIN can set PUBLISHED
     if (authUser.role === UserRole.COMPANY) {
       if (createCourseDto.status === CourseStatus.PUBLISHED) {
@@ -51,7 +48,7 @@ export class CoursesService {
         createCourseDto.status !== CourseStatus.PENDING_REVIEW
       ) {
         throw new ForbiddenException(
-          'COMPANY users may only set status to DRAFT or PENDING_REVIEW',
+          'COMPANY users may only set course status to DRAFT or PENDING_REVIEW',
         );
       }
     }
@@ -116,7 +113,7 @@ export class CoursesService {
           throw new NotFoundException('Course not found');
         }
       } else if (authUser.role === UserRole.COMPANY) {
-        const isCompanyOwner = course.companyId && course.companyId === authUser.userId;
+        const isCompanyOwner = course?.companyId === authUser.userId;
         const isCreator = course.createdBy === authUser.userId;
         if (!isCompanyOwner && !isCreator) {
           throw new NotFoundException('Course not found');
@@ -128,90 +125,58 @@ export class CoursesService {
     return course;
   }
 
+  async findAllCourses(
+    authUser: AuthTokenPayload,
+    published: boolean = false,
+  ): Promise<Course[]> {
+    const queryOptions = {
+      relations: {
+        modules: true,
+        meetingLinks: true,
+      },
+      order: {
+        createdAt: 'DESC' as const,
+        modules: { order: 'ASC' as const },
+      },
+    };
 
-    async findAllCourses(
-      authUser: AuthTokenPayload,
-      published: boolean = false,
-    ): Promise<Course[]> {
-      // TALENT: only published
-      if (authUser.role === UserRole.TALENT) {
-        return this.coursesRepository.find({
-          where: { status: CourseStatus.PUBLISHED },
-          relations: {
-            modules: true,
-            meetingLinks: true,
-          },
-          order: {
-            createdAt: 'DESC',
-            modules: {
-              order: 'ASC',
-            },
-          },
-        });
-      }
-
-      // COMPANY: only courses created by the company (filter by companyId)
+    const where = (() => {
       if (authUser.role === UserRole.COMPANY) {
-        const where = published
+        return published
           ? { companyId: authUser.userId, status: CourseStatus.PUBLISHED }
           : { companyId: authUser.userId };
-
-        return this.coursesRepository.find({
-          where,
-          relations: {
-            modules: true,
-            meetingLinks: true,
-          },
-          order: {
-            createdAt: 'DESC',
-            modules: {
-              order: 'ASC',
-            },
-          },
-        });
       }
+      if (authUser.role === UserRole.ADMIN) {
+        return published ? { status: CourseStatus.PUBLISHED } : {};
+      }
+      // TALENT or unauthenticated users only see published courses
+      return { status: CourseStatus.PUBLISHED };
+    })();
 
-      // ADMIN or others: respect `published` filter or return all
-      const where = published ? { status: CourseStatus.PUBLISHED } : {};
-
-      return this.coursesRepository.find({
-        where,
-        relations: {
-          modules: true,
-          meetingLinks: true,
-        },
-        order: {
-          createdAt: 'DESC',
-          modules: {
-            order: 'ASC',
-          },
-        },
-      });
-    }
+    return this.coursesRepository.find({
+      where,
+      ...queryOptions,
+    });
+  }
 
   async updateCourse(
     authUser: AuthTokenPayload,
     courseId: string,
     updateCourseDto: UpdateCourseDto,
   ): Promise<Course> {
+    this.validateManagementAccess(authUser);
     const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
     // Prevent COMPANY from setting status to PUBLISHED directly and require PENDING_REVIEW for publication requests
     if (authUser.role === UserRole.COMPANY) {
-      if (updateCourseDto.status === CourseStatus.PUBLISHED) {
-        throw new ForbiddenException(
-          'COMPANY users cannot publish courses directly; use pending_review to request publication',
-        );
-      }
-
       if (
         updateCourseDto.status &&
         updateCourseDto.status !== CourseStatus.DRAFT &&
         updateCourseDto.status !== CourseStatus.PENDING_REVIEW
       ) {
         throw new ForbiddenException(
-          'COMPANY users may only set status to DRAFT or PENDING_REVIEW',
+          'COMPANY users may only set status to DRAFT or PENDING_REVIEW. To request publication, use PENDING_REVIEW.',
         );
       }
     }
@@ -219,7 +184,10 @@ export class CoursesService {
     if (updateCourseDto.title) {
       course.title = updateCourseDto.title;
     }
-    if (updateCourseDto.description !== undefined) {
+    if (
+      updateCourseDto.description &&
+      updateCourseDto.description.trim() !== ''
+    ) {
       course.description = updateCourseDto.description;
     }
     if (updateCourseDto.status) {
@@ -233,10 +201,22 @@ export class CoursesService {
     authUser: AuthTokenPayload,
     courseId: string,
   ): Promise<void> {
-    const course = await this.findCourseById(courseId, authUser);
-    this.validateCourseOwnership(authUser, course);
+    this.validateManagementAccess(authUser);
 
-    await this.coursesRepository.remove(course);
+    const course = await this.findCourseById(courseId, authUser);
+
+    if (authUser.role === UserRole.COMPANY) {
+      const isCreator = course.createdBy === authUser.userId;
+      if (!isCreator) {
+        throw new ForbiddenException(
+          'You do not have permission to perform this action.',
+        );
+      }
+    }
+
+    // only the following users can proceed to "delete" (archive) the course: ADMIN (any) and COMPANY (if owner)
+    course.status = CourseStatus.ARCHIVED;
+    await this.coursesRepository.save(course);
   }
 
   async addModuleToCourse(
@@ -244,6 +224,7 @@ export class CoursesService {
     courseId: string,
     createCourseModuleDto: CreateCourseModuleDto,
   ): Promise<CourseModule> {
+    this.validateManagementAccess(authUser);
     const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
@@ -267,6 +248,7 @@ export class CoursesService {
     updateCourseModuleDto: UpdateCourseModuleDto,
   ): Promise<CourseModule> {
     const course = await this.findCourseById(courseId, authUser);
+    this.validateManagementAccess(authUser);
     this.validateCourseCreator(authUser, course);
 
     const module = await this.courseModulesRepository.findOne({
@@ -277,7 +259,10 @@ export class CoursesService {
       throw new NotFoundException('Module not found in this course');
     }
 
-    if (updateCourseModuleDto.title !== undefined) {
+    if (
+      updateCourseModuleDto.title &&
+      updateCourseModuleDto.title.trim() !== ''
+    ) {
       module.title = updateCourseModuleDto.title;
     }
     if (updateCourseModuleDto.description !== undefined) {
@@ -304,6 +289,7 @@ export class CoursesService {
     courseId: string,
     moduleId: string,
   ): Promise<void> {
+    this.validateManagementAccess(authUser);
     const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
@@ -323,6 +309,7 @@ export class CoursesService {
     courseId: string,
     addMeetingLinkDto: AddMeetingLinkDto,
   ): Promise<MeetingLink> {
+    this.validateManagementAccess(authUser);
     const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
@@ -343,6 +330,7 @@ export class CoursesService {
     courseId: string,
     meetingLinkId: string,
   ): Promise<void> {
+    this.validateManagementAccess(authUser);
     const course = await this.findCourseById(courseId, authUser);
     this.validateCourseOwnership(authUser, course);
 
@@ -357,34 +345,15 @@ export class CoursesService {
     await this.meetingLinksRepository.remove(meetingLink);
   }
 
-  async findCoursesForCompany(authUser: AuthTokenPayload): Promise<Course[]> {
-    if (authUser.role !== UserRole.COMPANY) {
-      throw new ForbiddenException('Only COMPANY users can access this');
-    }
-
-    return this.coursesRepository.find({
-      where: { companyId: authUser.userId },
-      relations: {
-        modules: true,
-        meetingLinks: true,
-      },
-      order: {
-        createdAt: 'DESC',
-        modules: {
-          order: 'ASC',
-        },
-      },
-    });
-  }
-
-  private validateAdminOrCompanyRole(authUser: AuthTokenPayload): void {
+  private validateManagementAccess(
+    authUser: AuthTokenPayload,
+    message: string = 'You do not have permission to perform this action.',
+  ): void {
     if (
       authUser.role !== UserRole.ADMIN &&
       authUser.role !== UserRole.COMPANY
     ) {
-      throw new ForbiddenException(
-        'Only ADMIN or COMPANY users can manage courses',
-      );
+      throw new ForbiddenException(message);
     }
   }
 
@@ -392,16 +361,32 @@ export class CoursesService {
     authUser: AuthTokenPayload,
     course: Course,
   ): void {
-    const isAdmin = authUser.role === UserRole.ADMIN;
+    const role = authUser.role;
     const isCreator = course.createdBy === authUser.userId;
-    const isCompanyOwner =
-      course.companyId && course.companyId === authUser.userId;
+    const baseMessage = 'You do not have permission to modify this course';
 
-    if (!isAdmin && !isCreator && !isCompanyOwner) {
-      throw new ForbiddenException(
-        'You do not have permission to modify this course',
-      );
+    this.validateManagementAccess(authUser, baseMessage);
+
+    if (role === UserRole.COMPANY) {
+      if (!isCreator) {
+        throw new ForbiddenException(baseMessage);
+      }
+      return;
     }
+
+    if (role === UserRole.ADMIN) {
+      if (isCreator) return;
+      const isOwnedByCompany = Boolean(course.companyId);
+      if (isOwnedByCompany) {
+        throw new ForbiddenException(
+          'ADMIN users cannot modify courses created by a COMPANY',
+        );
+      }
+      return;
+    }
+
+    // If new roles are added in the future, deny by default
+    throw new ForbiddenException(baseMessage);
   }
 
   private validateCourseCreator(

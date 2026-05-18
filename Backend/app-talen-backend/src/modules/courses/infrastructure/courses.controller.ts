@@ -100,8 +100,9 @@ export class CoursesController {
   })
   findCoursesForCompany(
     @Req() request: AuthenticatedRequest,
+    @Query('published') published?: boolean,
   ): Promise<Course[]> {
-    return this.coursesService.findCoursesForCompany(request.user);
+    return this.coursesService.findAllCourses(request.user, published ?? false);
   }
 
   @Get(':courseId')
