@@ -13,15 +13,78 @@ import type { AuthenticatedRequest } from '../../auth/infrastructure/types/authe
 import { CreateUserSkillDto } from '../application/dto/create-user-skill.dto';
 import { UpdateUserSkillDto } from '../application/dto/update-user-skill.dto';
 import { SkillsService } from '../application/skills.service';
+import { SkillLevel } from '../domain/skill-level.enum';
 import { UserSkill } from './entities/user-skill.entity';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOperation,
   ApiResponse,
   ApiTags,
   ApiParam,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+
+const createUserSkillRequestExample: CreateUserSkillDto = {
+  name: 'TypeScript',
+  category: 'technical',
+  level: SkillLevel.MEDIUM,
+  evidence: 'https://github.com/usuario/proyecto-typescript',
+  source: 'curso-online',
+};
+
+const updateUserSkillRequestExample: UpdateUserSkillDto = {
+  level: SkillLevel.ADVANCED,
+  evidence: 'https://www.credly.com/badges/typescript',
+  source: 'bootcamp',
+};
+
+const userSkillResponseExample = {
+  id: '605d2455-fdc0-4fbe-a20e-1292f6e69928',
+  profileId: 'c4b4e87a-c7f8-4cf8-a855-637b6a4b57e1',
+  skillId: 'e7f022ea-cf26-4a10-a0d2-3cc4df093221',
+  level: SkillLevel.ADVANCED,
+  evidence: 'https://www.credly.com/badges/typescript',
+  source: 'bootcamp',
+  skill: {
+    id: 'e7f022ea-cf26-4a10-a0d2-3cc4df093221',
+    name: 'typescript',
+    category: 'technical',
+  },
+};
+
+const unauthorizedExample = {
+  statusCode: 401,
+  message: 'Unauthorized',
+  error: 'Unauthorized',
+};
+
+const forbiddenExample = {
+  statusCode: 403,
+  message: 'Only TALENT users can manage skills',
+  error: 'Forbidden',
+};
+
+const profileNotFoundExample = {
+  statusCode: 404,
+  message: 'Profile not found for this user',
+  error: 'Not Found',
+};
+
+const skillNotFoundExample = {
+  statusCode: 404,
+  message: 'Skill not found for this user',
+  error: 'Not Found',
+};
+
+const badRequestValidationExample = {
+  statusCode: 400,
+  message: ['level must be one of: INITIAL, MEDIUM, ADVANCED'],
+  error: 'Bad Request',
+};
 
 @ApiTags('Habilidades')
 @ApiBearerAuth()
@@ -40,6 +103,21 @@ export class SkillsController {
     status: 200,
     description: 'Lista de habilidades.',
     type: [UserSkill],
+    schema: {
+      example: [userSkillResponseExample],
+    },
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente o invalido.',
+    example: unauthorizedExample,
+  })
+  @ApiForbiddenResponse({
+    description: 'El usuario autenticado no tiene rol TALENT.',
+    example: forbiddenExample,
+  })
+  @ApiNotFoundResponse({
+    description: 'No se encontro el perfil del usuario autenticado.',
+    example: profileNotFoundExample,
   })
   findMine(@Req() request: AuthenticatedRequest): Promise<UserSkill[]> {
     return this.skillsService.findMine(request.user);
@@ -53,11 +131,33 @@ export class SkillsController {
   @ApiBody({
     type: CreateUserSkillDto,
     description: 'Datos de la habilidad a agregar.',
+    schema: {
+      example: createUserSkillRequestExample,
+    },
   })
   @ApiResponse({
     status: 201,
     description: 'Habilidad agregada.',
     type: UserSkill,
+    schema: {
+      example: userSkillResponseExample,
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Error de validacion del body.',
+    example: badRequestValidationExample,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente o invalido.',
+    example: unauthorizedExample,
+  })
+  @ApiForbiddenResponse({
+    description: 'El usuario autenticado no tiene rol TALENT.',
+    example: forbiddenExample,
+  })
+  @ApiNotFoundResponse({
+    description: 'No se encontro el perfil del usuario autenticado.',
+    example: profileNotFoundExample,
   })
   createMine(
     @Req() request: AuthenticatedRequest,
@@ -73,16 +173,48 @@ export class SkillsController {
   })
   @ApiParam({
     name: 'skillId',
-    description: 'ID de la habilidad a actualizar.',
+    description: 'UUID de la habilidad a actualizar.',
+    example: 'e7f022ea-cf26-4a10-a0d2-3cc4df093221',
   })
   @ApiBody({
     type: UpdateUserSkillDto,
     description: 'Datos a actualizar en la habilidad.',
+    schema: {
+      example: updateUserSkillRequestExample,
+    },
   })
   @ApiResponse({
     status: 200,
     description: 'Habilidad actualizada.',
     type: UserSkill,
+    schema: {
+      example: userSkillResponseExample,
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Error de validacion del body.',
+    example: badRequestValidationExample,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Token ausente o invalido.',
+    example: unauthorizedExample,
+  })
+  @ApiForbiddenResponse({
+    description: 'El usuario autenticado no tiene rol TALENT.',
+    example: forbiddenExample,
+  })
+  @ApiNotFoundResponse({
+    description: 'No se encontro el perfil del usuario o la habilidad solicitada.',
+    examples: {
+      profileNotFound: {
+        summary: 'Perfil no encontrado',
+        value: profileNotFoundExample,
+      },
+      skillNotFound: {
+        summary: 'Habilidad no encontrada',
+        value: skillNotFoundExample,
+      },
+    },
   })
   updateMine(
     @Req() request: AuthenticatedRequest,
