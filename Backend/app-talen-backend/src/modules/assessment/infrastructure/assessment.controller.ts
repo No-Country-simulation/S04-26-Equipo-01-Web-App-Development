@@ -33,17 +33,30 @@ export class AssessmentController {
 
   @Post('me')
   @ApiOperation({
-    summary: 'Crear evaluaciÃ³n personal',
-    description: 'Crea una nueva evaluaciÃ³n para el usuario autenticado.',
+    summary: 'Crear evaluación personal',
+    description: 'Crea una nueva evaluación para el usuario autenticado.',
   })
   @ApiBody({
     type: CreateAssessmentDto,
-    description: 'Datos para crear la evaluaciÃ³n.',
+    description: 'Datos para crear la evaluación.',
   })
   @ApiResponse({
     status: 201,
-    description: 'EvaluaciÃ³n creada.',
+    description: 'Evaluación creada.',
     type: Assessment,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Datos de evaluación inválidos.',
+    content: {
+      'application/json': {
+        example: {
+          statusCode: 400,
+          message: 'digitalLevel must be one of: basic, intermediate, advanced',
+          error: 'Bad Request',
+        },
+      },
+    },
   })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
   @ApiForbiddenResponse({ description: 'Solo usuarios TALENT pueden crear evaluaciones.' })
@@ -73,13 +86,13 @@ export class AssessmentController {
 
   @Get('me/latest')
   @ApiOperation({
-    summary: 'Obtener mi Ãºltima evaluaciÃ³n',
+    summary: 'Obtener mi última evaluación',
     description:
-      'Devuelve la evaluaciÃ³n mÃ¡s reciente del usuario autenticado.',
+      'Devuelve la evaluación más reciente del usuario autenticado.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Ãšltima evaluaciÃ³n.',
+    description: 'Última evaluación.',
     type: Assessment,
   })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
@@ -99,6 +112,20 @@ export class AssessmentController {
     description: 'Evaluacion consolidada creada.',
     type: Assessment,
   })
+  @ApiResponse({
+    status: 400,
+    description: 'No se puede consolidar la evaluación con el estado actual de los tests.',
+    content: {
+      'application/json': {
+        example: {
+          statusCode: 400,
+          message:
+            'No test results found. Complete at least one psychotechnical and one technical test first.',
+          error: 'Bad Request',
+        },
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
   @ApiForbiddenResponse({ description: 'Solo usuarios TALENT pueden consolidar evaluaciones.' })
   consolidateMyAssessment(
@@ -109,12 +136,12 @@ export class AssessmentController {
 
   @Get('psychotechnical-tests/questions')
   @ApiOperation({
-    summary: 'Preguntas de test psicotÃ©cnico',
-    description: 'Obtiene el listado de preguntas para el test psicotÃ©cnico.',
+    summary: 'Preguntas de test psicotécnicos',
+    description: 'Obtiene el listado de preguntas para el test psicotécnicos.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Preguntas del test psicotÃ©cnico.',
+    description: 'Preguntas del test psicotécnicos.',
     type: [AssessmentTestQuestionDto],
   })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
@@ -143,12 +170,12 @@ export class AssessmentController {
 
   @Get('technical-tests/questions')
   @ApiOperation({
-    summary: 'Preguntas de test tÃ©cnico',
-    description: 'Obtiene el listado de preguntas para el test tÃ©cnico.',
+    summary: 'Preguntas de test técnico',
+    description: 'Obtiene el listado de preguntas para el test técnico.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Preguntas del test tÃ©cnico.',
+    description: 'Preguntas del test técnico.',
     type: [AssessmentTestQuestionDto],
   })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
@@ -159,18 +186,31 @@ export class AssessmentController {
 
   @Post('me/psychotechnical-tests/submit')
   @ApiOperation({
-    summary: 'Enviar respuestas de test psicotÃ©cnico',
+    summary: 'Enviar respuestas de test psicotécnicos',
     description:
-      'EnvÃ­a las respuestas del usuario para el test psicotÃ©cnico.',
+      'Envía las respuestas del usuario para el test psicotécnicos.',
   })
   @ApiBody({
     type: SubmitAssessmentTestDto,
-    description: 'Respuestas del test psicotÃ©cnico.',
+    description: 'Respuestas del test psicotécnicos.',
   })
   @ApiResponse({
     status: 201,
-    description: 'Resultado del test psicotÃ©cnico.',
+    description: 'Resultado del test psicotécnicos.',
     type: AssessmentTestResultEntity,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Respuestas del test psicotécnicos inválidas.',
+    content: {
+      'application/json': {
+        example: {
+          statusCode: 400,
+          message: 'Missing answer for question psy_logic_1',
+          error: 'Bad Request',
+        },
+      },
+    },
   })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
   @ApiForbiddenResponse({ description: 'Solo usuarios TALENT pueden enviar resultados de tests.' })
@@ -186,17 +226,30 @@ export class AssessmentController {
 
   @Post('me/technical-tests/submit')
   @ApiOperation({
-    summary: 'Enviar respuestas de test tÃ©cnico',
-    description: 'EnvÃ­a las respuestas del usuario para el test tÃ©cnico.',
+    summary: 'Enviar respuestas de test técnico',
+    description: 'Envía las respuestas del usuario para el test técnico.',
   })
   @ApiBody({
     type: SubmitAssessmentTestDto,
-    description: 'Respuestas del test tÃ©cnico.',
+    description: 'Respuestas del test técnico.',
   })
   @ApiResponse({
     status: 201,
-    description: 'Resultado del test tÃ©cnico.',
+    description: 'Resultado del test técnico.',
     type: AssessmentTestResultEntity,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Respuestas del test técnico inválidas.',
+    content: {
+      'application/json': {
+        example: {
+          statusCode: 400,
+          message: 'Invalid question tech_invalid_1',
+          error: 'Bad Request',
+        },
+      },
+    },
   })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
   @ApiForbiddenResponse({ description: 'Solo usuarios TALENT pueden enviar resultados de tests.' })
@@ -212,17 +265,30 @@ export class AssessmentController {
 
   @Post('me/psychotechnical-tests')
   @ApiOperation({
-    summary: 'Crear resultado de test psicotÃ©cnico',
-    description: 'Crea un nuevo resultado para el test psicotÃ©cnico.',
+    summary: 'Crear resultado de test psicotécnicos',
+    description: 'Crea un nuevo resultado para el test psicotécnicos.',
   })
   @ApiBody({
     type: CreateAssessmentTestDto,
-    description: 'Datos del resultado del test psicotÃ©cnico.',
+    description: 'Datos del resultado del test psicotécnicos.',
   })
   @ApiResponse({
     status: 201,
     description: 'Resultado creado.',
     type: AssessmentTestResultEntity,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Resultado del test psicotécnicos inválido.',
+    content: {
+      'application/json': {
+        example: {
+          statusCode: 400,
+          message: 'Score cannot be greater than maxScore',
+          error: 'Bad Request',
+        },
+      },
+    },
   })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
   @ApiForbiddenResponse({ description: 'Solo usuarios TALENT pueden crear resultados.' })
@@ -238,17 +304,30 @@ export class AssessmentController {
 
   @Post('me/technical-tests')
   @ApiOperation({
-    summary: 'Crear resultado de test tÃ©cnico',
-    description: 'Crea un nuevo resultado para el test tÃ©cnico.',
+    summary: 'Crear resultado de test técnico',
+    description: 'Crea un nuevo resultado para el test técnico.',
   })
   @ApiBody({
     type: CreateAssessmentTestDto,
-    description: 'Datos del resultado del test tÃ©cnico.',
+    description: 'Datos del resultado del test técnico.',
   })
   @ApiResponse({
     status: 201,
     description: 'Resultado creado.',
     type: AssessmentTestResultEntity,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Resultado del test técnico inválido.',
+    content: {
+      'application/json': {
+        example: {
+          statusCode: 400,
+          message: 'Score cannot be greater than maxScore',
+          error: 'Bad Request',
+        },
+      },
+    },
   })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
   @ApiForbiddenResponse({ description: 'Solo usuarios TALENT pueden crear resultados.' })
@@ -283,13 +362,13 @@ export class AssessmentController {
 
   @Get('me/test-results/latest')
   @ApiOperation({
-    summary: 'Obtener mis Ãºltimos resultados de tests',
+    summary: 'Obtener mis últimos resultados de tests',
     description:
-      'Devuelve los resultados mÃ¡s recientes de los tests del usuario autenticado.',
+      'Devuelve los resultados más recientes de los tests del usuario autenticado.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Ãšltimos resultados.',
+    description: 'Últimos resultados.',
     type: [AssessmentTestResultEntity],
   })
   @ApiUnauthorizedResponse({ description: 'Token invalido o ausente.' })
