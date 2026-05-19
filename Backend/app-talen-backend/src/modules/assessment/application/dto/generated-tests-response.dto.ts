@@ -13,7 +13,9 @@ export class AssessmentTestQuestionDto {
   @ApiProperty({ example: 'tech_api_1' })
   id!: string;
 
-  @ApiProperty({ example: 'Que metodo HTTP se usa normalmente para crear un recurso?' })
+  @ApiProperty({
+    example: 'Que metodo HTTP se usa normalmente para crear un recurso?',
+  })
   text!: string;
 
   @ApiProperty({ example: 'api_design' })
@@ -39,7 +41,10 @@ export class GeneratedTest {
   })
   description!: string;
 
-  @ApiProperty({ enum: AssessmentTestType, example: AssessmentTestType.PSYCHOTECHNICAL })
+  @ApiProperty({
+    enum: AssessmentTestType,
+    example: AssessmentTestType.PSYCHOTECHNICAL,
+  })
   type!: AssessmentTestType;
 
   @ApiPropertyOptional({ example: 'Frontend', nullable: true })

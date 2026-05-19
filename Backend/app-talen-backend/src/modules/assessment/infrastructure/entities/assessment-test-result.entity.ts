@@ -20,7 +20,10 @@ export class AssessmentTestResultEntity {
   @Column()
   profileId!: string;
 
-  @ApiProperty({ enum: AssessmentTestType, example: AssessmentTestType.TECHNICAL })
+  @ApiProperty({
+    enum: AssessmentTestType,
+    example: AssessmentTestType.TECHNICAL,
+  })
   @Column({
     type: 'enum',
     enum: AssessmentTestType,
@@ -47,7 +50,10 @@ export class AssessmentTestResultEntity {
   @Column({ type: 'int' })
   percentage!: number;
 
-  @ApiProperty({ enum: AssessmentTestResult, example: AssessmentTestResult.HIGH })
+  @ApiProperty({
+    enum: AssessmentTestResult,
+    example: AssessmentTestResult.HIGH,
+  })
   @Column({
     type: 'enum',
     enum: AssessmentTestResult,
