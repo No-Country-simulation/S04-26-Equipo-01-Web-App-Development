@@ -4,17 +4,14 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: app-talen-api
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
-      PORT: 3000
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_DATABASE: ${DB_DATABASE}
-      TYPEORM_SYNC: ${TYPEORM_SYNC}
+      PORT: ${PORT:-3000}
+      DB_HOST: ${DB_HOST:-localhost}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_DATABASE: ${DB_DATABASE:-postgres}
+      TYPEORM_SYNC: ${TYPEORM_SYNC:-false}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
