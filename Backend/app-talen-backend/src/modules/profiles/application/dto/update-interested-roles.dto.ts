@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -7,6 +8,12 @@ import {
 import { InterestedRole } from '../../domain/interested-role.enum';
 
 export class UpdateInterestedRolesDto {
+  @ApiProperty({
+    description: 'Lista de roles laborales de interés.',
+    enum: InterestedRole,
+    isArray: true,
+    example: [InterestedRole.FRONTEND_DEVELOPER, InterestedRole.UX_UI_DESIGNER],
+  })
   @ArrayMinSize(1)
   @ArrayMaxSize(5)
   @ArrayUnique()
