@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Skill } from '../../../skills/infrastructure/entities/skill.entity';
+import { LearningModuleCategory } from '../../domain/learning-module-category.enum';
 import { LearningPath } from './learning-path.entity';
 import { UserModuleProgress } from './user-module-progress.entity';
 
@@ -25,8 +26,11 @@ export class LearningModule {
   @Column({ nullable: true })
   description?: string;
 
-  @Column()
-  category!: string;
+  @Column({
+    type: 'enum',
+    enum: LearningModuleCategory,
+  })
+  category!: LearningModuleCategory;
 
   @Column({ nullable: true })
   contentUrl?: string;
