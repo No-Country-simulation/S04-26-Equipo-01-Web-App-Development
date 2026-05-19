@@ -42,26 +42,31 @@ const updateModuleProgressRequestExample: UpdateModuleProgressDto = {
 const unauthorizedExample = {
   statusCode: 401,
   message: 'Unauthorized',
+  error: 'Unauthorized',
 };
 
 const forbiddenExample = {
   statusCode: 403,
   message: 'Only TALENT users can manage learning paths',
+  error: 'Forbidden',
 };
 
 const notFoundProfileExample = {
   statusCode: 404,
   message: 'Profile not found for this user',
+  error: 'Not Found',
 };
 
 const notFoundAssessmentExample = {
   statusCode: 404,
   message: 'Assessment not found for this profile',
+  error: 'Not Found',
 };
 
 const notFoundLearningModuleExample = {
   statusCode: 404,
   message: 'Learning module not found for this profile',
+  error: 'Not Found',
 };
 
 @ApiTags('Aprendizaje')
@@ -208,7 +213,7 @@ export class LearningController {
       completed: {
         summary: 'Marcar modulo como completado',
         value: {
-          status: 'COMPLETED',
+          status: ModuleStatus.COMPLETED,
         },
       },
     },
