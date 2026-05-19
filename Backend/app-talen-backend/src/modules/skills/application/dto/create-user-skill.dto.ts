@@ -28,7 +28,8 @@ export class CreateUserSkillDto {
   level!: SkillLevel;
 
   @ApiPropertyOptional({
-    description: 'Evidencia opcional de la habilidad (proyecto, certificacion, etc.).',
+    description:
+      'Evidencia opcional de la habilidad (proyecto, certificacion, etc.).',
     example: 'https://github.com/usuario/proyecto-typescript',
   })
   @IsOptional()

@@ -63,7 +63,8 @@ export class LearningPath {
 
   @ApiPropertyOptional({
     description: 'Motivo resumido de la recomendacion.',
-    example: 'Coincidencia alta con habilidades tecnicas y objetivo profesional.',
+    example:
+      'Coincidencia alta con habilidades tecnicas y objetivo profesional.',
   })
   @Column({ nullable: true })
   matchingReason?: string;

@@ -204,7 +204,8 @@ export class SkillsController {
     example: forbiddenExample,
   })
   @ApiNotFoundResponse({
-    description: 'No se encontro el perfil del usuario o la habilidad solicitada.',
+    description:
+      'No se encontro el perfil del usuario o la habilidad solicitada.',
     examples: {
       profileNotFound: {
         summary: 'Perfil no encontrado',
