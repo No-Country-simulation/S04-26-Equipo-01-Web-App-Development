@@ -176,7 +176,9 @@ export class AssessmentService {
     );
   }
 
-  async consolidateMyAssessment(authUser: AuthTokenPayload): Promise<Assessment> {
+  async consolidateMyAssessment(
+    authUser: AuthTokenPayload,
+  ): Promise<Assessment> {
     const testResults = await this.findMyTestResults(authUser);
 
     if (testResults.length === 0) {
@@ -205,11 +207,14 @@ export class AssessmentService {
 
     return this.createMe(authUser, {
       digitalLevel: this.mapPercentageToAssessmentLevel(technicalAverage),
-      cognitiveLevel: this.mapPercentageToAssessmentLevel(psychotechnicalAverage),
+      cognitiveLevel: this.mapPercentageToAssessmentLevel(
+        psychotechnicalAverage,
+      ),
       socioEmotionalLevel: this.mapPercentageToAssessmentLevel(
         psychotechnicalAverage,
       ),
-      careerGoal: 'Mejorar el perfil profesional con base en resultados de pruebas.',
+      careerGoal:
+        'Mejorar el perfil profesional con base en resultados de pruebas.',
       answers: {
         source: 'assessment_test_results',
         generatedAt: new Date().toISOString(),
@@ -254,7 +259,8 @@ export class AssessmentService {
 
     // Generar tests
     const psychotechnicalTests = this.generatePsychotechnicalTests();
-    const technicalTests = this.generateTechnicalTestsFromSkills(technicalSkills);
+    const technicalTests =
+      this.generateTechnicalTestsFromSkills(technicalSkills);
 
     // Contar total de preguntas
     const totalQuestionsCount =
@@ -425,9 +431,7 @@ export class AssessmentService {
     return Math.round(total / results.length);
   }
 
-  private mapPercentageToAssessmentLevel(
-    percentage: number,
-  ): AssessmentLevel {
+  private mapPercentageToAssessmentLevel(percentage: number): AssessmentLevel {
     if (percentage >= 75) {
       return AssessmentLevel.ADVANCED;
     }
