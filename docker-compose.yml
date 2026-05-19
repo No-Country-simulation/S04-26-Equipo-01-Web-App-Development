@@ -1,24 +1,28 @@
 services:
-  backend:
+  api:
     build:
       context: ./Backend/app-talen-backend
       dockerfile: Dockerfile
-    container_name: app-talen-backend
+    container_name: api
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      PORT: 3000
-      DB_HOST: postgres
+      PORT: ${PORT:-3000}
+      DB_HOST: ${DB_HOST:-localhost}
       DB_PORT: 5432
-      DB_USERNAME: postgres
-      DB_PASSWORD: postgres
-      DB_DATABASE: talent_db
-      TYPEORM_SYNC: "true"
-      JWT_SECRET: change-this-secret
-      JWT_EXPIRES_IN: 7d
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_DATABASE: ${DB_DATABASE:-postgres}
+      TYPEORM_SYNC: ${TYPEORM_SYNC:-false}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
     ports:
-      - "3000:3000"
+      - "${PORT}:3000"
 
   frontend:
     build:
@@ -26,7 +30,7 @@ services:
       dockerfile: Dockerfile
     container_name: app-talen-frontend
     depends_on:
-      - backend
+      - api
     ports:
       - "8080:80"
 
@@ -34,11 +38,11 @@ services:
     image: postgres:16-alpine
     container_name: app-talen-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: talent_db
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
     ports:
-      - "5434:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
