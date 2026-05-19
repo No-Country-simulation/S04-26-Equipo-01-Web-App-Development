@@ -88,23 +88,6 @@ export class CoursesController {
     return this.coursesService.findAllCourses(request.user, published ?? false);
   }
 
-  @Get('company/me')
-  @ApiOperation({
-    summary: 'Mis cursos como COMPANY',
-    description: 'Obtiene todos los cursos de la empresa autenticada',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de cursos de la empresa',
-    type: [Course],
-  })
-  findCoursesForCompany(
-    @Req() request: AuthenticatedRequest,
-    @Query('published') published?: boolean,
-  ): Promise<Course[]> {
-    return this.coursesService.findAllCourses(request.user, published ?? false);
-  }
-
   @Get(':courseId')
   @ApiOperation({ summary: 'Obtener curso por ID' })
   @ApiParam({ name: 'courseId', description: 'ID del curso' })
