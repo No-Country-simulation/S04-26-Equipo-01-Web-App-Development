@@ -1,6 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AssessmentTestType } from '../../domain/assessment-test-type.enum';
 
+export class GeneratedTestsProfileDto {
+  @ApiProperty({ example: 'Ada Lovelace' })
+  fullName!: string;
+
+  @ApiProperty({ example: 4 })
+  technicalSkillsCount!: number;
+
+  @ApiProperty({ example: 20 })
+  totalQuestionsCount!: number;
+}
+
 export class AssessmentQuestionOptionDto {
   @ApiProperty({ example: 'a' })
   value!: string;
@@ -72,15 +83,4 @@ export class GeneratedTestsResponseDto {
 
   @ApiProperty({ type: () => GeneratedTestsProfileDto })
   profile!: GeneratedTestsProfileDto;
-}
-
-export class GeneratedTestsProfileDto {
-  @ApiProperty({ example: 'Ada Lovelace' })
-  fullName!: string;
-
-  @ApiProperty({ example: 4 })
-  technicalSkillsCount!: number;
-
-  @ApiProperty({ example: 20 })
-  totalQuestionsCount!: number;
 }
