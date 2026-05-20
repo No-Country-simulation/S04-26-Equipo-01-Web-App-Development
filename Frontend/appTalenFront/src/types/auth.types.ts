@@ -6,14 +6,6 @@ export const UserRole = {
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  [key: string]: unknown;
-}
-
 export interface RegisterDto {
   email: string;
   password: string;

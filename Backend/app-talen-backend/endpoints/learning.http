@@ -1,39 +1,5 @@
 @baseUrl = http://localhost:3001
 @accessToken =
 
-### Generate my learning path from latest assessment
-POST {{baseUrl}}/learning-paths/me/generate
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "title": "Mi ruta inicial de empleabilidad",
-  "objective": "Mejorar habilidades digitales, cognitivas y socioemocionales"
-}
-
-### Get my learning paths
-GET {{baseUrl}}/learning-paths/me
-Authorization: Bearer {{accessToken}}
-
-### Get my learning modules
-GET {{baseUrl}}/learning-modules/me
-Authorization: Bearer {{accessToken}}
-
-### Update my module progress
-PATCH {{baseUrl}}/learning-modules/module-id/progress
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "status": "IN_PROGRESS",
-  "progress": 50
-}
-
-### Complete my module
-PATCH {{baseUrl}}/learning-modules/module-id/progress
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "status": "COMPLETED"
-}
+### Learning endpoints
+# Agregar aca los requests del modulo learning cuando existan controllers.

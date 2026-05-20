@@ -1,29 +1,5 @@
 @baseUrl = http://localhost:3001
 @accessToken =
 
-### Create my assessment
-POST {{baseUrl}}/assessments/me
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "digitalLevel": "basic",
-  "cognitiveLevel": "intermediate",
-  "socioEmotionalLevel": "basic",
-  "careerGoal": "Conseguir mi primer trabajo como developer frontend",
-  "answers": {
-    "usesEmail": true,
-    "usesSpreadsheets": false,
-    "problemSolving": "medium",
-    "teamwork": "high",
-    "preferredRole": "frontend"
-  }
-}
-
-### Get my assessments
-GET {{baseUrl}}/assessments/me
-Authorization: Bearer {{accessToken}}
-
-### Get my latest assessment
-GET {{baseUrl}}/assessments/me/latest
-Authorization: Bearer {{accessToken}}
+### Assessment endpoints
+# Agregar aca los requests del modulo assessment cuando existan controllers.

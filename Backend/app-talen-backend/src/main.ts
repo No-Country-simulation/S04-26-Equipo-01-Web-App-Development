@@ -52,4 +52,4 @@ function parseCorsOrigin(origin: string): boolean | string | string[] {
   return origin;
 }
 
-void bootstrap();
+bootstrap();

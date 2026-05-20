@@ -21,9 +21,6 @@ export class User {
   @Column()
   password!: string;
 
-  @Column({ nullable: true })
-  imageUrl?: string;
-
   @Column({
     type: 'enum',
     enum: UserRole,

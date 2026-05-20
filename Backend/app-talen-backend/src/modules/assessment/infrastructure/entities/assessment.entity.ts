@@ -5,7 +5,6 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { AssessmentLevel } from '../../domain/assessment-level.enum';
 import { Profile } from '../../../profiles/infrastructure/entities/profile.entity';
 
 @Entity('assessments')
@@ -16,26 +15,14 @@ export class Assessment {
   @Column()
   profileId!: string;
 
-  @Column({
-    type: 'enum',
-    enum: AssessmentLevel,
-    nullable: true,
-  })
-  digitalLevel?: AssessmentLevel;
+  @Column({ nullable: true })
+  digitalLevel?: string;
 
-  @Column({
-    type: 'enum',
-    enum: AssessmentLevel,
-    nullable: true,
-  })
-  cognitiveLevel?: AssessmentLevel;
+  @Column({ nullable: true })
+  cognitiveLevel?: string;
 
-  @Column({
-    type: 'enum',
-    enum: AssessmentLevel,
-    nullable: true,
-  })
-  socioEmotionalLevel?: AssessmentLevel;
+  @Column({ nullable: true })
+  socioEmotionalLevel?: string;
 
   @Column({ nullable: true })
   careerGoal?: string;
