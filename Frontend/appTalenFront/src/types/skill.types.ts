@@ -31,6 +31,7 @@ export interface CreateUserSkillDto {
 }
 
 export interface UpdateUserSkillDto {
+  category?: string;
   level?: SkillLevel;
   evidence?: string;
   source?: string;

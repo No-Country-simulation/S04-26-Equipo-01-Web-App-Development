@@ -1,6 +1,7 @@
 export enum ApplicationStatus {
   PRESELECTED = 'PRESELECTED',
   CONTACTED = 'CONTACTED',
+  FINALIST = 'FINALIST',
   REJECTED = 'REJECTED',
   HIRED = 'HIRED',
 }
