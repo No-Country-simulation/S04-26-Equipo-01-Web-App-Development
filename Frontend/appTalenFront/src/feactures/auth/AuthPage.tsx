@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { loginUser, registerUser } from '../../services/auth.service';
 import { UserRole, type AuthUser, type LoginDto, type RegisterDto } from '../../types/auth.types';
 
+const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 interface AuthPageProps {
   onLoginSuccess: (user: AuthUser) => void;
   tab?: number;
@@ -296,7 +298,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
             startIcon={<Google />} 
             fullWidth 
             sx={{ borderColor: '#2D3748', color: '#2D3748' }}
-            onClick={() => window.location.href = '/api/auth/google'}
+            onClick={() => window.location.href = `${apiBaseUrl}/auth/google`}
           >
             Google
           </Button>
@@ -305,7 +307,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
             startIcon={<LinkedIn />} 
             fullWidth 
             sx={{ borderColor: '#0A66C2', color: '#0A66C2' }}
-            onClick={() => window.location.href = '/api/auth/linkedin'}
+            onClick={() => window.location.href = `${apiBaseUrl}/auth/linkedin`}
           >
             LinkedIn
           </Button>
