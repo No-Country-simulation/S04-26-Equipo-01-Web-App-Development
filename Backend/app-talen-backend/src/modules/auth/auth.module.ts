@@ -11,6 +11,13 @@ import { AuthController } from './infrastructure/auth.controller';
 import { LinkedInStrategy } from './infrastructure/strategies/linkedin.strategy';
 import { GoogleStrategy } from './infrastructure/strategies/google.strategy';
 
+const hasLinkedInCredentials =
+  Boolean(process.env.LINKEDIN_CLIENT_ID) &&
+  Boolean(process.env.LINKEDIN_CLIENT_SECRET);
+const hasGoogleCredentials =
+  Boolean(process.env.GOOGLE_CLIENT_ID) &&
+  Boolean(process.env.GOOGLE_CLIENT_SECRET);
+
 @Module({
   imports: [
     ConfigModule,
@@ -39,7 +46,12 @@ import { GoogleStrategy } from './infrastructure/strategies/google.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, LinkedInStrategy, GoogleStrategy],
+  providers: [
+    AuthService,
+    JwtAuthGuard,
+    ...(hasLinkedInCredentials ? [LinkedInStrategy] : []),
+    ...(hasGoogleCredentials ? [GoogleStrategy] : []),
+  ],
   exports: [JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}

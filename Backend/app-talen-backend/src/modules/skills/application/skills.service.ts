@@ -1,5 +1,4 @@
 import {
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -52,7 +51,14 @@ export class SkillsService {
     });
 
     if (existingUserSkill) {
-      throw new ConflictException('Skill already exists for this user');
+      existingUserSkill.level = createUserSkillDto.level;
+      existingUserSkill.evidence = createUserSkillDto.evidence;
+      existingUserSkill.source = createUserSkillDto.source;
+      await this.userSkillsRepository.save(existingUserSkill);
+      return this.findMyUserSkillBySkillId(
+        profile.id,
+        existingUserSkill.skillId,
+      );
     }
 
     const userSkill = this.userSkillsRepository.create({
@@ -68,7 +74,15 @@ export class SkillsService {
       return this.findMyUserSkillBySkillId(profile.id, savedUserSkill.skillId);
     } catch (error) {
       if (this.isUniqueViolation(error)) {
-        throw new ConflictException('Skill already exists for this user');
+        const persistedUserSkill = await this.findMyUserSkillBySkillId(
+          profile.id,
+          skill.id,
+        );
+        persistedUserSkill.level = createUserSkillDto.level;
+        persistedUserSkill.evidence = createUserSkillDto.evidence;
+        persistedUserSkill.source = createUserSkillDto.source;
+        await this.userSkillsRepository.save(persistedUserSkill);
+        return this.findMyUserSkillBySkillId(profile.id, skill.id);
       }
 
       throw error;

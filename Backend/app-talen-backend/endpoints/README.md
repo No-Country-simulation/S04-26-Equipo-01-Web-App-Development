@@ -15,6 +15,8 @@ Los archivos `.http` pueden ejecutarse desde VS Code usando la extension REST Cl
 - `companies.http`: espacio para endpoints del modulo companies.
 - `marketplace.http`: espacio para endpoints del modulo marketplace.
 
+- `courses.http`: espacio para endpoints del modulo courses (CRUD, módulos, enlaces de reunión, aprobación).
+
 ## Uso
 
 Levantar el backend:
@@ -39,4 +41,11 @@ Cuando un endpoint requiera autenticacion, primero ejecutar login o register y c
 
 ```http
 @accessToken = token
+
+## Notas sobre `courses`
+
+- `GET /courses`: los usuarios con rol `TALENT` solo verán cursos en estado `PUBLISHED`. Otros roles (COMPANY, ADMIN) podrán ver más resultados según permisos y el query param `?published=true`.
+- Flujo de publicación: las empresas no pueden publicar directamente. Pueden crear o actualizar un curso con estado `PENDING_REVIEW` para solicitar publicación. Un `ADMIN` debe aprobar el curso mediante `POST /courses/:courseId/approve` para cambiar el estado a `PUBLISHED`.
+
+Se recomienda usar los archivos `.http` correspondientes para probar cada endpoint y actualizar `@accessToken` tras autenticarse.
 ```

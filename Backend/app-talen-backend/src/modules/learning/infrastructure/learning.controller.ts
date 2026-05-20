@@ -16,13 +16,37 @@ import { LearningService } from '../application/learning.service';
 import { LearningModule as LearningModuleEntity } from './entities/learning-module.entity';
 import { LearningPath } from './entities/learning-path.entity';
 import { UserModuleProgress } from './entities/user-module-progress.entity';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
+@ApiTags('Aprendizaje')
+@ApiBearerAuth()
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class LearningController {
   constructor(private readonly learningService: LearningService) {}
 
   @Post('learning-paths/me/generate')
+  @ApiOperation({
+    summary: 'Generar ruta de aprendizaje personalizada',
+    description:
+      'Crea una ruta de aprendizaje adaptada al usuario autenticado.',
+  })
+  @ApiBody({
+    type: GenerateLearningPathDto,
+    description: 'Datos para generar la ruta de aprendizaje.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Ruta de aprendizaje generada.',
+    type: LearningPath,
+  })
   generateMyLearningPath(
     @Req() request: AuthenticatedRequest,
     @Body() generateLearningPathDto: GenerateLearningPathDto,
@@ -34,6 +58,16 @@ export class LearningController {
   }
 
   @Get('learning-paths/me')
+  @ApiOperation({
+    summary: 'Listar mis rutas de aprendizaje',
+    description:
+      'Devuelve todas las rutas de aprendizaje del usuario autenticado.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de rutas de aprendizaje.',
+    type: [LearningPath],
+  })
   findMyLearningPaths(
     @Req() request: AuthenticatedRequest,
   ): Promise<LearningPath[]> {
@@ -41,6 +75,16 @@ export class LearningController {
   }
 
   @Get('learning-modules/me')
+  @ApiOperation({
+    summary: 'Listar mis módulos de aprendizaje',
+    description:
+      'Devuelve todos los módulos de aprendizaje asignados al usuario autenticado.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de módulos de aprendizaje.',
+    type: [LearningModuleEntity],
+  })
   findMyLearningModules(
     @Req() request: AuthenticatedRequest,
   ): Promise<LearningModuleEntity[]> {
@@ -48,6 +92,21 @@ export class LearningController {
   }
 
   @Patch('learning-modules/:moduleId/progress')
+  @ApiOperation({
+    summary: 'Actualizar progreso de módulo',
+    description:
+      'Permite actualizar el progreso de un módulo de aprendizaje específico.',
+  })
+  @ApiParam({ name: 'moduleId', description: 'ID del módulo de aprendizaje.' })
+  @ApiBody({
+    type: UpdateModuleProgressDto,
+    description: 'Datos de progreso a actualizar.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Progreso actualizado.',
+    type: UserModuleProgress,
+  })
   updateMyModuleProgress(
     @Req() request: AuthenticatedRequest,
     @Param('moduleId') moduleId: string,

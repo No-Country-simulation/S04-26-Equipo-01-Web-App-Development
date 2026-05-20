@@ -9,6 +9,7 @@ import {
 import { CompanyFeedback } from '../../../marketplace/infrastructure/entities/company-feedback.entity';
 import { JobOpportunity } from '../../../marketplace/infrastructure/entities/job-opportunity.entity';
 import { User } from '../../../users/infrastructure/entities/user.entity';
+import { Course } from '../../../courses/infrastructure/entities/course.entity';
 
 @Entity('companies')
 export class Company {
@@ -36,4 +37,7 @@ export class Company {
 
   @OneToMany(() => CompanyFeedback, (feedback) => feedback.company)
   feedbacks!: CompanyFeedback[];
+
+  @OneToMany(() => Course, (course) => course.company)
+  courses!: Course[];
 }

@@ -32,6 +32,9 @@ export class JobOpportunity {
   @Column({ nullable: true })
   modality?: string;
 
+  @Column({ type: 'int', default: 1 })
+  vacancies!: number;
+
   @CreateDateColumn()
   createdAt!: Date;
 

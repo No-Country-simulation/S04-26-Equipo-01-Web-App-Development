@@ -1,0 +1,63 @@
+@baseUrl = http://localhost:3001
+@recruiterToken = 
+
+### 0. Create vacancy
+POST {{baseUrl}}/recruiter/vacancies
+Authorization: Bearer {{recruiterToken}}
+Content-Type: application/json
+
+{
+	"title": "Frontend Developer React",
+	"description": "Buscamos desarrollador con experiencia en React y TypeScript.",
+	"requiredSkills": ["React", "TypeScript", "Tailwind"],
+	"location": "Lima, Peru",
+	"modality": "Remoto"
+}
+
+### 0.1 Get my created vacancies
+GET {{baseUrl}}/recruiter/vacancies
+Authorization: Bearer {{recruiterToken}}
+
+### 1. Get all candidates (list)
+GET {{baseUrl}}/recruiter/candidates
+Authorization: Bearer {{recruiterToken}}
+
+### 2. Get all candidates filtered by name
+GET {{baseUrl}}/recruiter/candidates?name=Leandro
+Authorization: Bearer {{recruiterToken}}
+
+### 3. Get all candidates filtered by title
+GET {{baseUrl}}/recruiter/candidates?title=Developer
+Authorization: Bearer {{recruiterToken}}
+
+### 4. Get all candidates filtered by skill
+GET {{baseUrl}}/recruiter/candidates?skill=React
+Authorization: Bearer {{recruiterToken}}
+
+### 5. Get all candidates filtered by minimum employability score
+GET {{baseUrl}}/recruiter/candidates?minScore=70
+Authorization: Bearer {{recruiterToken}}
+
+### 6. Get candidate details
+GET {{baseUrl}}/recruiter/candidates/uuid-here
+Authorization: Bearer {{recruiterToken}}
+
+### 7. Get candidate skills
+GET {{baseUrl}}/recruiter/candidates/uuid-here/skills
+Authorization: Bearer {{recruiterToken}}
+
+### 8. Get candidate CV
+GET {{baseUrl}}/recruiter/candidates/uuid-here/cv
+Authorization: Bearer {{recruiterToken}}
+
+### 9. Get candidate assessment results (technical and psychotechnical tests)
+GET {{baseUrl}}/recruiter/candidates/uuid-here/assessment-results
+Authorization: Bearer {{recruiterToken}}
+
+### 10. Get candidate learning path
+GET {{baseUrl}}/recruiter/candidates/uuid-here/learning-path
+Authorization: Bearer {{recruiterToken}}
+
+### 11. Get candidate courses
+GET {{baseUrl}}/recruiter/candidates/uuid-here/courses
+Authorization: Bearer {{recruiterToken}}

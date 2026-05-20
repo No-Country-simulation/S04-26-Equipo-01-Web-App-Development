@@ -55,3 +55,81 @@ export interface CreateAssessmentDto {
   careerGoal?: string;
   answers: Record<string, unknown>;
 }
+
+export const AssessmentTestType = {
+  PSYCHOTECHNICAL: 'PSYCHOTECHNICAL',
+  TECHNICAL: 'TECHNICAL',
+} as const;
+
+export type AssessmentTestType =
+  (typeof AssessmentTestType)[keyof typeof AssessmentTestType];
+
+export const AssessmentTestResult = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+} as const;
+
+export type AssessmentTestResult =
+  (typeof AssessmentTestResult)[keyof typeof AssessmentTestResult];
+
+export interface AssessmentQuestionOption {
+  value: string;
+  label: string;
+}
+
+export interface AssessmentTestQuestion {
+  id: string;
+  text: string;
+  category: string;
+  type: 'single_choice';
+  options: AssessmentQuestionOption[];
+}
+
+export interface AssessmentTestResultEntity {
+  id: string;
+  profileId: string;
+  type: AssessmentTestType;
+  title: string;
+  answers: Record<string, unknown>;
+  score: number;
+  maxScore: number;
+  percentage: number;
+  result: AssessmentTestResult;
+  feedback?: string | null;
+  createdAt: string;
+}
+
+export interface SubmitAssessmentTestDto {
+  answers: Record<string, string>;
+}
+
+export interface CreateAssessmentTestDto {
+  title: string;
+  answers: Record<string, unknown>;
+  score: number;
+  maxScore?: number;
+  feedback?: string;
+}
+
+export interface GeneratedTest {
+  id: string;
+  name: string;
+  description: string;
+  type: AssessmentTestType;
+  skillName?: string;
+  questionCount: number;
+  estimatedDurationMin: number;
+  questions: AssessmentTestQuestion[];
+}
+
+export interface GeneratedTestsResponseDto {
+  psychotechnicalTests: GeneratedTest[];
+  technicalTests: GeneratedTest[];
+  totalTests: number;
+  profile: {
+    fullName: string;
+    technicalSkillsCount: number;
+    totalQuestionsCount: number;
+  };
+}
