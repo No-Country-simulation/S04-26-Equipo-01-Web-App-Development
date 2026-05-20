@@ -26,18 +26,6 @@ export class LearningPath {
   @Column({ default: true })
   aiGenerated!: boolean;
 
-  @Column({ nullable: true })
-  recommendedTrack?: string;
-
-  @Column({ type: 'int', nullable: true })
-  confidence?: number;
-
-  @Column({ nullable: true })
-  matchingReason?: string;
-
-  @Column({ type: 'jsonb', nullable: true })
-  alternativeTracks?: Record<string, unknown>[];
-
   @CreateDateColumn()
   createdAt!: Date;
 

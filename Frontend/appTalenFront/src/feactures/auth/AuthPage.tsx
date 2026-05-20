@@ -3,15 +3,13 @@ import type { FC } from 'react';
 import { Box, Container, Typography, TextField, Button, Paper, Tabs, Tab } from '@mui/material';
 import { Google, LinkedIn } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import type { AuthUser } from '../../App';
 import { loginUser, registerUser } from '../../services/auth.service';
-import { UserRole, type AuthUser, type LoginDto, type RegisterDto } from '../../types/auth.types';
-
-const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { UserRole, type LoginDto, type RegisterDto } from '../../types/auth.types';
 
 interface AuthPageProps {
   onLoginSuccess: (user: AuthUser) => void;
   tab?: number;
-  handleAdminLogin?: (email: string, password: string) => boolean;
 }
 
 interface FormErrors {
@@ -77,7 +75,7 @@ const validateRegisterPassword = (password: string): string | undefined => {
   return undefined;
 };
 
-export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, handleAdminLogin }) => {
+export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }) => {
   const navigate = useNavigate();
   const [internalTab, setInternalTab] = useState<number>(externalTab ?? 0); // 0 = Iniciar sesión, 1 = Registrarse
   const [role, setRole] = useState<'talento' | 'empresa'>('talento');
@@ -161,20 +159,17 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
           password: formData.password,
           role: role === 'talento' ? UserRole.TALENT : UserRole.COMPANY,
         };
+
         await registerUser(payload);
         navigate('/login');
       } else {
-        // Lógica especial para Admin01
-        if (handleAdminLogin && handleAdminLogin(formData.email.trim(), formData.password)) {
-          // El login de admin fue exitoso, el resto ya lo maneja handleAdminLogin
-          return;
-        }
         const payload: LoginDto = {
           email: formData.email.trim(),
           password: formData.password,
         };
         const response = await loginUser(payload);
         const token = response.accessToken;
+
         if (token && response.user) {
           localStorage.setItem('token', token);
           const authUser: AuthUser = {
@@ -298,7 +293,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
             startIcon={<Google />} 
             fullWidth 
             sx={{ borderColor: '#2D3748', color: '#2D3748' }}
-            onClick={() => window.location.href = `${apiBaseUrl}/auth/google`}
+            onClick={() => window.location.href = '/api/auth/google'}
           >
             Google
           </Button>
@@ -307,7 +302,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
             startIcon={<LinkedIn />} 
             fullWidth 
             sx={{ borderColor: '#0A66C2', color: '#0A66C2' }}
-            onClick={() => window.location.href = `${apiBaseUrl}/auth/linkedin`}
+            onClick={() => window.location.href = '/api/auth/linkedin'}
           >
             LinkedIn
           </Button>

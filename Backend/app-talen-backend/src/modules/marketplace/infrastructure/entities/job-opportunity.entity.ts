@@ -38,9 +38,6 @@ export class JobOpportunity {
   @ManyToOne(() => Company, (company) => company.opportunities)
   company!: Company;
 
-  @OneToMany(
-    () => CandidateApplication,
-    (application) => application.opportunity,
-  )
+  @OneToMany(() => CandidateApplication, (application) => application.opportunity)
   applications!: CandidateApplication[];
 }
