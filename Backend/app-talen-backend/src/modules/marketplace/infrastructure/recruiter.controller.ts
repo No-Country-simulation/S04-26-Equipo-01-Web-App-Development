@@ -125,7 +125,10 @@ export class RecruiterController {
     @Req() request: AuthenticatedRequest,
     @Param('vacancyId') vacancyId: string,
   ) {
-    return this.marketplaceService.getVacancyPipeline(request.user.userId, vacancyId);
+    return this.marketplaceService.getVacancyPipeline(
+      request.user.userId,
+      vacancyId,
+    );
   }
 
   @Post('vacancies/:vacancyId/candidates/:candidateId/select')
@@ -200,7 +203,8 @@ export class RecruiterController {
   @Get('candidates')
   @ApiOperation({
     summary: 'Obtener lista de candidatos',
-    description: 'Retorna lista de candidatos (talentos) que el reclutador puede ver con filtros opcionales',
+    description:
+      'Retorna lista de candidatos (talentos) que el reclutador puede ver con filtros opcionales',
   })
   @ApiResponse({
     status: 200,
@@ -276,7 +280,8 @@ export class RecruiterController {
   @Get('candidates/:candidateId/assessment-results')
   @ApiOperation({
     summary: 'Obtener resultados de evaluaciones',
-    description: 'Retorna resultados de pruebas técnicas y psicotécnicas del candidato',
+    description:
+      'Retorna resultados de pruebas técnicas y psicotécnicas del candidato',
   })
   @ApiResponse({
     status: 200,
@@ -302,9 +307,7 @@ export class RecruiterController {
     status: 404,
     description: 'Ruta de aprendizaje no encontrada',
   })
-  async getCandidateLearningPath(
-    @Param('candidateId') candidateId: string,
-  ) {
+  async getCandidateLearningPath(@Param('candidateId') candidateId: string) {
     return this.marketplaceService.getCandidateLearningPath(candidateId);
   }
 
@@ -318,9 +321,7 @@ export class RecruiterController {
     description: 'Cursos obtenidos',
     isArray: true,
   })
-  async getCandidateCourses(
-    @Param('candidateId') candidateId: string,
-  ) {
+  async getCandidateCourses(@Param('candidateId') candidateId: string) {
     return this.marketplaceService.getCandidateCourses(candidateId);
   }
 
