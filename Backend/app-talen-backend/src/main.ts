@@ -12,8 +12,10 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
   app.enableCors({
-    origin: parseCorsOrigin(configService.get<string>('CORS_ORIGIN', '*')),
+    origin: true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   app.useGlobalPipes(
@@ -40,16 +42,4 @@ async function bootstrap() {
   logger.log(`Swagger docs available on http://localhost:${port}/docs`);
 }
 
-function parseCorsOrigin(origin: string): boolean | string | string[] {
-  if (origin === '*') {
-    return true;
-  }
-
-  if (origin.includes(',')) {
-    return origin.split(',').map((value) => value.trim());
-  }
-
-  return origin;
-}
-
-bootstrap();
+void bootstrap();

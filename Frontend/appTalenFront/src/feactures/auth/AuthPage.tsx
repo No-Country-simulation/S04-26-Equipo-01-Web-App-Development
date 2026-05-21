@@ -1,15 +1,32 @@
 import React, { useState } from 'react';
 import type { FC } from 'react';
-import { Box, Container, Typography, TextField, Button, Paper, Tabs, Tab } from '@mui/material';
-import { Google, LinkedIn } from '@mui/icons-material';
+import {
+  Box,
+  Container,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Tabs,
+  Tab,
+  InputAdornment,
+  IconButton,
+  FormControl,
+  InputLabel,
+  OutlinedInput,
+  FormHelperText,
+} from '@mui/material';
+import { Google, LinkedIn, Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import type { AuthUser } from '../../App';
 import { loginUser, registerUser } from '../../services/auth.service';
-import { UserRole, type LoginDto, type RegisterDto } from '../../types/auth.types';
+import { UserRole, type AuthUser, type LoginDto, type RegisterDto } from '../../types/auth.types';
+
+const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 interface AuthPageProps {
   onLoginSuccess: (user: AuthUser) => void;
   tab?: number;
+  handleAdminLogin?: (email: string, password: string) => boolean;
 }
 
 interface FormErrors {
@@ -75,13 +92,18 @@ const validateRegisterPassword = (password: string): string | undefined => {
   return undefined;
 };
 
-export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }) => {
+export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, handleAdminLogin }) => {
   const navigate = useNavigate();
   const [internalTab, setInternalTab] = useState<number>(externalTab ?? 0); // 0 = Iniciar sesión, 1 = Registrarse
   const [role, setRole] = useState<'talento' | 'empresa'>('talento');
   const [formData, setFormData] = useState({ email: '', password: '', name: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const handleClickShowPassword = () => setShowPassword((show) => !show);
+  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+  };
 
   const tab = externalTab ?? internalTab;
 
@@ -98,13 +120,13 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }
     setRole(newRole);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: undefined, general: undefined }));
   };
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
 
     if (name === 'email') {
@@ -159,17 +181,20 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }
           password: formData.password,
           role: role === 'talento' ? UserRole.TALENT : UserRole.COMPANY,
         };
-
         await registerUser(payload);
         navigate('/login');
       } else {
+        // Lógica especial para Admin01
+        if (handleAdminLogin && handleAdminLogin(formData.email.trim(), formData.password)) {
+          // El login de admin fue exitoso, el resto ya lo maneja handleAdminLogin
+          return;
+        }
         const payload: LoginDto = {
           email: formData.email.trim(),
           password: formData.password,
         };
         const response = await loginUser(payload);
         const token = response.accessToken;
-
         if (token && response.user) {
           localStorage.setItem('token', token);
           const authUser: AuthUser = {
@@ -254,19 +279,42 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }
             helperText={errors.email}
             autoComplete="email"
           />
-          <TextField 
-            label="Contraseña" 
-            name="password" 
-            type="password" 
-            value={formData.password} 
-            onChange={handleChange} 
-            onBlur={handleBlur}
-            required 
-            fullWidth 
-            error={Boolean(errors.password)}
-            helperText={errors.password || (tab === 1 ? 'Usa una contraseña segura para proteger tu cuenta.' : undefined)}
-            autoComplete={tab === 0 ? 'current-password' : 'new-password'}
-          />
+          <FormControl fullWidth required error={Boolean(errors.password)} variant="outlined">
+            <InputLabel htmlFor="password-input">Contraseña</InputLabel>
+            <OutlinedInput
+              id="password-input"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              value={formData.password}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              autoComplete={tab === 0 ? 'current-password' : 'new-password'}
+              label="Contraseña"
+              endAdornment={
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    onClick={handleClickShowPassword}
+                    onMouseDown={handleMouseDownPassword}
+                    edge="end"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              }
+              sx={{
+                backgroundColor: '#fff',
+                '& input:-webkit-autofill': {
+                  WebkitBoxShadow: '0 0 0 100px #fff inset',
+                  WebkitTextFillColor: '#000',
+                },
+              }}
+            />
+            <FormHelperText>
+              {errors.password || (tab === 1 ? 'Usa una contraseña segura para proteger tu cuenta.' : ' ')}
+            </FormHelperText>
+          </FormControl>
           {tab === 1 && (
             <Typography variant="caption" sx={{ color: '#4A5568' }}>
               Formato sugerido: {REGISTER_PASSWORD_RULES.join(' ')}
@@ -293,7 +341,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }
             startIcon={<Google />} 
             fullWidth 
             sx={{ borderColor: '#2D3748', color: '#2D3748' }}
-            onClick={() => window.location.href = '/api/auth/google'}
+            onClick={() => window.location.href = `${apiBaseUrl}/auth/google`}
           >
             Google
           </Button>
@@ -302,7 +350,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab }
             startIcon={<LinkedIn />} 
             fullWidth 
             sx={{ borderColor: '#0A66C2', color: '#0A66C2' }}
-            onClick={() => window.location.href = '/api/auth/linkedin'}
+            onClick={() => window.location.href = `${apiBaseUrl}/auth/linkedin`}
           >
             LinkedIn
           </Button>

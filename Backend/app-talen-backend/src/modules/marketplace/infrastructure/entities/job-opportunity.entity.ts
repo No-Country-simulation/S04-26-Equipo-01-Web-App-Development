@@ -32,12 +32,18 @@ export class JobOpportunity {
   @Column({ nullable: true })
   modality?: string;
 
+  @Column({ type: 'int', default: 1 })
+  vacancies!: number;
+
   @CreateDateColumn()
   createdAt!: Date;
 
   @ManyToOne(() => Company, (company) => company.opportunities)
   company!: Company;
 
-  @OneToMany(() => CandidateApplication, (application) => application.opportunity)
+  @OneToMany(
+    () => CandidateApplication,
+    (application) => application.opportunity,
+  )
   applications!: CandidateApplication[];
 }

@@ -1,0 +1,4 @@
+export enum AssessmentTestType {
+  PSYCHOTECHNICAL = 'PSYCHOTECHNICAL',
+  TECHNICAL = 'TECHNICAL',
+}

@@ -1,5 +1,30 @@
 @baseUrl = http://localhost:3001
 @accessToken =
 
-### Skills endpoints
-# Agregar aca los requests del modulo skills cuando existan controllers.
+### Get my skills
+GET {{baseUrl}}/skills/me
+Authorization: Bearer {{accessToken}}
+
+### Add skill to my profile
+POST {{baseUrl}}/skills/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "react",
+  "category": "digital",
+  "level": "INITIAL",
+  "evidence": "Proyecto personal con componentes reutilizables",
+  "source": "experiencia previa"
+}
+
+### Update my skill
+PATCH {{baseUrl}}/skills/me/skill-id
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "level": "MEDIUM",
+  "evidence": "Complete modulo de React",
+  "source": "modulo"
+}
