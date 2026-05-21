@@ -10,8 +10,9 @@ export const Navbar = ({ isAuthenticated = false, onLogout }) => {
         {/* Link a la raíz */}
         <Typography 
           variant='h6' 
-          component={Link} 
-          to="/" 
+          component={HashLink}
+          smooth
+          to="/#home"
           sx={{ fontWeight: 'bold', color: '#fff', textDecoration: 'none' }}
         >
           Red de Bienestar Laboral
