@@ -47,21 +47,38 @@ export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPane
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
-  const loadLearningPaths = async () => {
+  const fetchLearningPaths = async (): Promise<LearningPath[]> => {
     try {
-      const paths = await getMyLearningPaths();
-      setLearningPaths(paths);
+      return await getMyLearningPaths();
     } catch (error) {
       console.error('Error loading learning paths:', error);
-      setLearningPaths([]);
-    } finally {
-      setIsLoading(false);
+      return [];
     }
   };
 
+  const loadLearningPaths = async () => {
+    const paths = await fetchLearningPaths();
+    setLearningPaths(paths);
+  };
+
   useEffect(() => {
-    setIsLoading(true);
-    void loadLearningPaths();
+    let isActive = true;
+
+    void fetchLearningPaths()
+      .then((paths) => {
+        if (isActive) {
+          setLearningPaths(paths);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [refreshToken]);
 
   const handleGenerateRoadmap = async () => {
