@@ -130,7 +130,7 @@ export const getMyLearningPaths = async (): Promise<LearningPath[]> => {
   try {
     const response = await api.get<LearningPath[]>('/learning-paths/me');
     return response.data;
-  } catch (error: unknown) {
+  } catch{
     const fallbackPaths = await getMyLearningPathsFromRecruiterFallback().catch(() => []);
     return fallbackPaths;
   }
@@ -140,7 +140,7 @@ export const getMyLearningModules = async (): Promise<LearningModule[]> => {
   try {
     const response = await api.get<LearningModule[]>('/learning-modules/me');
     return response.data;
-  } catch (error: unknown) {
+  } catch{
     const paths = await getMyLearningPathsFromRecruiterFallback().catch(() => []);
     return paths.flatMap((path) => path.modules ?? []);
   }

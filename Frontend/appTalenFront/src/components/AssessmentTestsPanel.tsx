@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -43,7 +43,7 @@ export const AssessmentTestsPanel = ({
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [testsErrorMessage, setTestsErrorMessage] = useState<string | null>(null);
 
-  const buildFallbackTest = (
+  const buildFallbackTest = useCallback((
     type: 'TECHNICAL' | 'PSYCHOTECHNICAL',
     questions: AssessmentTestQuestion[],
   ): GeneratedTest => ({
@@ -60,9 +60,9 @@ export const AssessmentTestsPanel = ({
     questionCount: questions.length,
     estimatedDurationMin: Math.max(10, Math.ceil(questions.length * 1.5)),
     questions,
-  });
+  }), []);
 
-  const withFallbackTests = async (
+  const withFallbackTests = useCallback(async (
     tests: GeneratedTestsResponseDto,
   ): Promise<GeneratedTestsResponseDto> => {
     const nextTests: GeneratedTestsResponseDto = {
@@ -91,7 +91,7 @@ export const AssessmentTestsPanel = ({
       nextTests.technicalTests.length + nextTests.psychotechnicalTests.length;
 
     return nextTests;
-  };
+  }, [activeTab, buildFallbackTest]);
 
   const getTestsForTab = (testsResponse?: GeneratedTestsResponseDto | null): GeneratedTest[] => {
     const source = testsResponse ?? generatedTests;
@@ -101,7 +101,7 @@ export const AssessmentTestsPanel = ({
     return [];
   };
 
-  const loadGeneratedTests = async (): Promise<GeneratedTestsResponseDto | null> => {
+  const loadGeneratedTests = useCallback(async (): Promise<GeneratedTestsResponseDto | null> => {
     try {
       setTestsErrorMessage(null);
       const tests = await generateTestsForProfile();
@@ -116,7 +116,7 @@ export const AssessmentTestsPanel = ({
       setTestsErrorMessage(message);
       return null;
     }
-  };
+  }, [withFallbackTests]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -128,7 +128,7 @@ export const AssessmentTestsPanel = ({
     };
 
     void loadData();
-  }, []);
+  }, [loadGeneratedTests]);
 
   const handleGenerateAndStartFirstTest = async () => {
     try {
@@ -693,6 +693,5 @@ export const AssessmentResultsPanel = ({
     </Paper>
   );
 };
-
 
 
