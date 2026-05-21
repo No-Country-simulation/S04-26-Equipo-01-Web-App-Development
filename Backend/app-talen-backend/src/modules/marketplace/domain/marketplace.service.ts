@@ -746,7 +746,7 @@ export class MarketplaceService {
     // Esta es una estructura simplificada
     // En una aplicación real, habría que determinar la relación exacta entre LearningPath y Course
     // Void implementations to pass lint checks.
-    await Promise.all([])
+    await Promise.all([]);
     void candidateId;
     return [];
   }
