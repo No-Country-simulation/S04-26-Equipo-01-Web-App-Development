@@ -8,7 +8,6 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from '../application/auth.service';
 import { LoginDto } from '../application/dto/login.dto';
 import { RegisterDto } from '../application/dto/register.dto';
@@ -26,6 +25,8 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { LinkedInAuthGuard } from './guards/linkedin-auth.guard';
 
 export const GetUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): ExternalProfileDto => {
@@ -93,7 +94,7 @@ export class AuthController {
     summary: 'Iniciar autenticación con LinkedIn',
     description: 'Redirige al usuario para autenticarse con LinkedIn.',
   })
-  @UseGuards(AuthGuard('linkedin'))
+  @UseGuards(LinkedInAuthGuard)
   linkedinAuth(): void {}
 
   @Get('linkedin/callback')
@@ -102,7 +103,7 @@ export class AuthController {
     description:
       'Callback para autenticación con LinkedIn. No requiere prueba manual.',
   })
-  @UseGuards(AuthGuard('linkedin'))
+  @UseGuards(LinkedInAuthGuard)
   async linkedinAuthRedirect(@GetUser() user: ExternalProfileDto) {
     return this.authService.loginWithExternalProvider(user);
   }
@@ -112,7 +113,7 @@ export class AuthController {
     summary: 'Iniciar autenticación con Google',
     description: 'Redirige al usuario para autenticarse con Google.',
   })
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleAuthGuard)
   googleAuth(): void {}
 
   @Get('google/callback')
@@ -121,7 +122,7 @@ export class AuthController {
     description:
       'Callback para autenticación con Google. No requiere prueba manual.',
   })
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleAuthGuard)
   async googleAuthRedirect(@GetUser() user: ExternalProfileDto) {
     return this.authService.loginWithExternalProvider(user);
   }
