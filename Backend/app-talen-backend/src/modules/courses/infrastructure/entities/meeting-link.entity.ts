@@ -31,6 +31,14 @@ export class MeetingLink {
   })
   platform!: MeetingPlatform;
 
+  @ApiPropertyOptional({
+    description: 'Scheduled date and time for the workshop',
+    type: String,
+    format: 'date-time',
+  })
+  @Column({ type: 'timestamptz', nullable: true })
+  scheduledAt?: Date;
+
   @ApiPropertyOptional({ description: 'Meeting password if required' })
   @Column({ nullable: true })
   password?: string;

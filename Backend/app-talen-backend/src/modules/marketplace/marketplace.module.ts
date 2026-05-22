@@ -12,6 +12,8 @@ import { User } from '../users/infrastructure/entities/user.entity';
 import { AuthModule } from '../auth/auth.module';
 import { Company } from '../companies/infrastructure/entities/company.entity';
 import { Skill } from '../skills/infrastructure/entities/skill.entity';
+import { LearningPath } from '../learning/infrastructure/entities/learning-path.entity';
+import { CourseModule } from '../courses/infrastructure/entities/course-module.entity';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { Skill } from '../skills/infrastructure/entities/skill.entity';
       User,
       Company,
       Skill,
+      LearningPath,
+      CourseModule,
     ]),
   ],
   controllers: [RecruiterController],

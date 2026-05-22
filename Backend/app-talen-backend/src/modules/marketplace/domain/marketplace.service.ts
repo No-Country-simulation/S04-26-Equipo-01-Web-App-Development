@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Profile } from '../../profiles/infrastructure/entities/profile.entity';
 import { UserSkill } from '../../skills/infrastructure/entities/user-skill.entity';
 import { AssessmentTestResultEntity } from '../../assessment/infrastructure/entities/assessment-test-result.entity';
@@ -18,6 +18,9 @@ import { Skill } from '../../skills/infrastructure/entities/skill.entity';
 import { CreateRecruiterSkillDto } from '../application/dto/create-recruiter-skill.dto';
 import { CandidateApplication } from '../infrastructure/entities/candidate-application.entity';
 import { ApplicationStatus } from './application-status.enum';
+import { LearningPath } from '../../learning/infrastructure/entities/learning-path.entity';
+import { ModuleStatus } from '../../learning/domain/module-status.enum';
+import { CourseModule } from '../../courses/infrastructure/entities/course-module.entity';
 
 interface CandidateFilters {
   name?: string;
@@ -65,7 +68,66 @@ export class MarketplaceService {
     private candidateApplicationRepository: Repository<CandidateApplication>,
     @InjectRepository(Skill)
     private readonly skillsCatalogRepository: Repository<Skill>,
+    @InjectRepository(LearningPath)
+    private readonly learningPathRepository: Repository<LearningPath>,
+    @InjectRepository(CourseModule)
+    private readonly courseModuleRepository: Repository<CourseModule>,
   ) {}
+
+  private parseCourseReferences(contentUrl?: string): {
+    courseId?: string;
+    courseModuleId?: string;
+  } {
+    if (!contentUrl || contentUrl.trim() === '') {
+      return {};
+    }
+
+    const uuidPattern =
+      /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi;
+
+    const lowerContent = contentUrl.toLowerCase();
+    const allUuids = contentUrl.match(uuidPattern) || [];
+
+    let courseId: string | undefined;
+    let courseModuleId: string | undefined;
+
+    const courseMatch = lowerContent.match(/courses\/([0-9a-f-]{36})/i);
+    if (courseMatch?.[1]) {
+      courseId = courseMatch[1];
+    }
+
+    const moduleMatch = lowerContent.match(/modules\/([0-9a-f-]{36})/i);
+    if (moduleMatch?.[1]) {
+      courseModuleId = moduleMatch[1];
+    }
+
+    if (!courseId) {
+      const explicitCourseId = lowerContent.match(/courseid=([0-9a-f-]{36})/i);
+      if (explicitCourseId?.[1]) {
+        courseId = explicitCourseId[1];
+      }
+    }
+
+    if (!courseModuleId) {
+      const explicitModuleId = lowerContent.match(/moduleid=([0-9a-f-]{36})/i);
+      if (explicitModuleId?.[1]) {
+        courseModuleId = explicitModuleId[1];
+      }
+    }
+
+    if (!courseId && allUuids.length > 0) {
+      courseId = allUuids[0];
+    }
+
+    if (!courseModuleId && allUuids.length > 1) {
+      courseModuleId = allUuids[1];
+    }
+
+    return {
+      courseId,
+      courseModuleId,
+    };
+  }
 
   private normalizePipelineStatus(
     status: ApplicationStatus,
@@ -740,15 +802,218 @@ export class MarketplaceService {
 
   /**
    * Obtiene los cursos de un candidato
-   * Por ahora retorna array vacío ya que Course no está directamente relacionado con LearningPath
+   * Se construyen a partir de la ruta de aprendizaje del talento.
+   * "Visto" = al menos un modulo en progreso/completado.
+   * "Aprobado" = todos los modulos completados.
    */
   async getCandidateCourses(candidateId: string) {
-    // Esta es una estructura simplificada
-    // En una aplicación real, habría que determinar la relación exacta entre LearningPath y Course
-    // Void implementations to pass lint checks.
-    await Promise.all([]);
-    void candidateId;
-    return [];
+    const learningPaths = await this.learningPathRepository.find({
+      where: { profileId: candidateId },
+      relations: {
+        modules: {
+          progress: true,
+        },
+      },
+      order: {
+        createdAt: 'DESC',
+        modules: {
+          order: 'ASC',
+        },
+      },
+    });
+
+    const moduleReferences = learningPaths.flatMap((path) =>
+      (path.modules || []).map((module) => ({
+        pathId: path.id,
+        pathTitle: path.title,
+        module,
+        refs: this.parseCourseReferences(module.contentUrl),
+      })),
+    );
+
+    const referencedModuleIds = Array.from(
+      new Set(
+        moduleReferences
+          .map((entry) => entry.refs.courseModuleId)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+
+    const referencedCourseIds = Array.from(
+      new Set(
+        moduleReferences
+          .map((entry) => entry.refs.courseId)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+
+    const linkedCourseModules =
+      referencedModuleIds.length > 0
+        ? await this.courseModuleRepository.find({
+            where: { id: In(referencedModuleIds) },
+            relations: {
+              course: true,
+            },
+          })
+        : [];
+
+    const moduleById = new Map(
+      linkedCourseModules.map((module) => [module.id, module]),
+    );
+
+    const linkedCoursesById = new Map<string, { id: string; title: string }>();
+    linkedCourseModules.forEach((module) => {
+      if (module.course?.id) {
+        linkedCoursesById.set(module.course.id, {
+          id: module.course.id,
+          title: module.course.title,
+        });
+      }
+    });
+
+    referencedCourseIds.forEach((courseId) => {
+      if (!linkedCoursesById.has(courseId)) {
+        linkedCoursesById.set(courseId, {
+          id: courseId,
+          title: 'Curso de academia',
+        });
+      }
+    });
+
+    const linkedCourseStats = new Map<
+      string,
+      {
+        id: string;
+        title: string;
+        modules: number;
+        completedModules: number;
+        viewedModules: number;
+      }
+    >();
+
+    moduleReferences.forEach((entry) => {
+      const progress = (entry.module.progress || []).find(
+        (item) => item.profileId === candidateId,
+      );
+
+      const linkedModule = entry.refs.courseModuleId
+        ? moduleById.get(entry.refs.courseModuleId)
+        : undefined;
+
+      const effectiveCourseId =
+        linkedModule?.courseId || entry.refs.courseId || undefined;
+
+      if (!effectiveCourseId) {
+        return;
+      }
+
+      const courseData = linkedCoursesById.get(effectiveCourseId) || {
+        id: effectiveCourseId,
+        title: entry.pathTitle || 'Curso de academia',
+      };
+
+      const current = linkedCourseStats.get(effectiveCourseId) || {
+        id: courseData.id,
+        title: courseData.title,
+        modules: 0,
+        completedModules: 0,
+        viewedModules: 0,
+      };
+
+      current.modules += 1;
+
+      if (progress?.status === ModuleStatus.COMPLETED) {
+        current.completedModules += 1;
+        current.viewedModules += 1;
+      } else if (progress?.status === ModuleStatus.IN_PROGRESS) {
+        current.viewedModules += 1;
+      }
+
+      linkedCourseStats.set(effectiveCourseId, current);
+    });
+
+    const linkedCourses = Array.from(linkedCourseStats.values()).map(
+      (course) => {
+        const status =
+          course.modules > 0 && course.completedModules === course.modules
+            ? 'completed'
+            : course.viewedModules > 0
+              ? 'in_progress'
+              : 'pending';
+
+        const progress =
+          course.modules > 0
+            ? Math.round((course.completedModules / course.modules) * 100)
+            : 0;
+
+        return {
+          id: course.id,
+          title: course.title,
+          description: '',
+          status,
+          progress,
+          modules: course.modules,
+          completedModules: course.completedModules,
+        };
+      },
+    );
+
+    const fallbackLearningPathCourses = learningPaths.map((path) => {
+      const modules = path.modules || [];
+      const totalModules = modules.length;
+
+      let completedModules = 0;
+      let viewedModules = 0;
+
+      modules.forEach((module) => {
+        const moduleProgress = (module.progress || []).find(
+          (progress) => progress.profileId === candidateId,
+        );
+
+        if (!moduleProgress) {
+          return;
+        }
+
+        if (moduleProgress.status === ModuleStatus.COMPLETED) {
+          completedModules += 1;
+          viewedModules += 1;
+          return;
+        }
+
+        if (moduleProgress.status === ModuleStatus.IN_PROGRESS) {
+          viewedModules += 1;
+        }
+      });
+
+      const status =
+        totalModules > 0 && completedModules === totalModules
+          ? 'completed'
+          : viewedModules > 0
+            ? 'in_progress'
+            : 'pending';
+
+      const progress =
+        totalModules > 0
+          ? Math.round((completedModules / totalModules) * 100)
+          : 0;
+
+      return {
+        id: path.id,
+        title: path.title,
+        description: path.objective || '',
+        status,
+        progress,
+        modules: totalModules,
+        completedModules,
+      };
+    });
+
+    const linkedIds = new Set(linkedCourses.map((course) => course.id));
+
+    return [
+      ...linkedCourses,
+      ...fallbackLearningPathCourses.filter((course) => !linkedIds.has(course.id)),
+    ];
   }
 
   /**

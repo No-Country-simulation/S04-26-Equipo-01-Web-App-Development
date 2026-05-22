@@ -2,6 +2,7 @@ export const UserRole = {
   TALENT: 'TALENT',
   COMPANY: 'COMPANY',
   ADMIN: 'ADMIN',
+  RECRUITER: 'RECRUITER',
 } as const;
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
@@ -11,6 +12,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
+  roles?: UserRole[];
   [key: string]: unknown;
 }
 
