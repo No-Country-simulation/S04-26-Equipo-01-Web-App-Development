@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Box, CssBaseline } from '@mui/material';
 import { Navbar } from './layout/Navbar';
 import { Footer } from './layout/Footer';
@@ -9,6 +9,7 @@ import { TalentDashboard } from './feactures/profile/TalentDashboard';
 import { CompanyDashboard } from './feactures/marketplace/CompanyDashboard';
 import { AdminDashboard } from './feactures/admin/AdminDashboard';
 import { AcademyPro } from './feactures/academy/AcademyPro.tsx';
+import { LoginSuccess } from './feactures/auth/LoginSuccess';
 import { getStoredAuthUser, loginAdmin } from './utils/admin-auth';
 import type { AuthUser } from './types/auth.types';
 
@@ -20,10 +21,10 @@ function AppContent() {
     navigate('/register');
   };
 
-  const handleLoginSuccess = (userData: AuthUser) => {
+  const handleLoginSuccess = useCallback((userData: AuthUser) => {
     setUser(userData);
     navigate('/dashboard');
-  };
+  }, [navigate]);
 
   const handleAdminLogin = (email: string, password: string) => {
     const adminUser = loginAdmin(email, password);
@@ -66,6 +67,12 @@ function AppContent() {
           <Route 
             path="/register" 
             element={user ? <Navigate to="/dashboard" /> : <AuthPage onLoginSuccess={handleLoginSuccess} tab={1} />} 
+          />
+
+          {/* Ruta Atrapadora para OAuth */}
+          <Route 
+            path="/login-success" 
+            element={<LoginSuccess onLoginSuccess={handleLoginSuccess} />} 
           />
 
           <Route

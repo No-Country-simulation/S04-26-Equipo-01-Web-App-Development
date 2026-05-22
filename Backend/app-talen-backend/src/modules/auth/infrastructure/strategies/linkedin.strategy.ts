@@ -21,7 +21,7 @@ export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
       tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
       clientID: configService.get<string>('LINKEDIN_CLIENT_ID')!,
       clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET')!,
-      callbackURL: 'http://localhost:3000/auth/linkedin/callback',
+      callbackURL: configService.get<string>('LINKEDIN_CALLBACK_URL')!,
       scope: ['openid', 'profile', 'email'],
       passReqToCallback: true,
     });
