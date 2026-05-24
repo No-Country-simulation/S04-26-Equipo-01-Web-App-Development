@@ -1012,7 +1012,9 @@ export class MarketplaceService {
 
     return [
       ...linkedCourses,
-      ...fallbackLearningPathCourses.filter((course) => !linkedIds.has(course.id)),
+      ...fallbackLearningPathCourses.filter(
+        (course) => !linkedIds.has(course.id),
+      ),
     ];
   }
 
