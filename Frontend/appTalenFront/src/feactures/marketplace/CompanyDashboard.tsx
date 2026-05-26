@@ -282,6 +282,10 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
+  const [dashboardMetrics, setDashboardMetrics] =
+    useState<DashboardMetrics>(INITIAL_DASHBOARD_METRICS);
+  const [loadingDashboardMetrics, setLoadingDashboardMetrics] =
+    useState(false);
 
   const loadCandidates = async () => {
     setLoadingCandidates(true);
@@ -335,6 +339,75 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       setCandidatesError('No se pudo cargar la lista de candidatos desde backend.');
     } finally {
       setLoadingCandidates(false);
+    }
+  };
+
+  const loadDashboardMetrics = async () => {
+    setLoadingDashboardMetrics(true);
+
+    try {
+      const [vacancies, candidatePool] = await Promise.all([
+        getMyVacancies(),
+        getCandidates(),
+      ]);
+
+      const pipelines = await Promise.all(
+        vacancies.map(async (vacancy) => {
+          const pipeline = await getVacancyPipeline(vacancy.id);
+          return pipeline;
+        }),
+      );
+
+      const accumulated = pipelines.reduce(
+        (metrics, pipeline) => {
+          if (!pipeline) {
+            return metrics;
+          }
+
+          const preselected = pipeline.preselected?.length || 0;
+          const selected = pipeline.selected?.length || 0;
+          const finalists = pipeline.finalists?.length || 0;
+          const accepted = pipeline.accepted?.length || 0;
+
+          metrics.preselectedCandidates += preselected;
+          metrics.selectedCandidates += selected;
+          metrics.finalistCandidates += finalists;
+
+          if (accepted > 0) {
+            metrics.finishedRecruitmentProcesses += 1;
+          }
+
+          return metrics;
+        },
+        {
+          ...INITIAL_DASHBOARD_METRICS,
+        },
+      );
+
+      const availableCandidatesCount =
+        accumulated.preselectedCandidates +
+        accumulated.selectedCandidates +
+        accumulated.finalistCandidates;
+
+      const finishedRecruitmentProcesses =
+        accumulated.finishedRecruitmentProcesses;
+
+      setDashboardMetrics({
+        openVacancies: Math.max(vacancies.length - finishedRecruitmentProcesses, 0),
+        availableCandidates:
+          availableCandidatesCount > 0
+            ? availableCandidatesCount
+            : candidatePool.length,
+        preselectedCandidates: accumulated.preselectedCandidates,
+        selectedCandidates: accumulated.selectedCandidates,
+        finalistCandidates: accumulated.finalistCandidates,
+        finishedRecruitmentProcesses,
+      });
+    } catch (error) {
+      console.warn('No se pudieron calcular metricas del dashboard', error);
+      setDashboardMetrics(INITIAL_DASHBOARD_METRICS);
+    } finally {
+      setLoadingDashboardMetrics(false);
     }
   };
 
@@ -399,10 +472,6 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     type: 'success' | 'error' | 'info';
     message: string;
   } | null>(null);
-  const [dashboardMetrics, setDashboardMetrics] =
-    useState<DashboardMetrics>(INITIAL_DASHBOARD_METRICS);
-  const [loadingDashboardMetrics, setLoadingDashboardMetrics] =
-    useState(false);
   const [vacancyPipeline, setVacancyPipeline] = useState<VacancyPipeline | null>(null);
   const [loadingVacancyPipeline, setLoadingVacancyPipeline] = useState(false);
   const [updatingCandidateId, setUpdatingCandidateId] = useState<string | null>(null);
@@ -493,75 +562,6 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     requiredSkills: requestForm.requiredSkills,
     vacancies: requestForm.vacancies,
   }), [requestForm]);
-
-  const loadDashboardMetrics = async () => {
-    setLoadingDashboardMetrics(true);
-
-    try {
-      const [vacancies, candidatePool] = await Promise.all([
-        getMyVacancies(),
-        getCandidates(),
-      ]);
-
-      const pipelines = await Promise.all(
-        vacancies.map(async (vacancy) => {
-          const pipeline = await getVacancyPipeline(vacancy.id);
-          return pipeline;
-        }),
-      );
-
-      const accumulated = pipelines.reduce(
-        (metrics, pipeline) => {
-          if (!pipeline) {
-            return metrics;
-          }
-
-          const preselected = pipeline.preselected?.length || 0;
-          const selected = pipeline.selected?.length || 0;
-          const finalists = pipeline.finalists?.length || 0;
-          const accepted = pipeline.accepted?.length || 0;
-
-          metrics.preselectedCandidates += preselected;
-          metrics.selectedCandidates += selected;
-          metrics.finalistCandidates += finalists;
-
-          if (accepted > 0) {
-            metrics.finishedRecruitmentProcesses += 1;
-          }
-
-          return metrics;
-        },
-        {
-          ...INITIAL_DASHBOARD_METRICS,
-        },
-      );
-
-      const availableCandidatesCount =
-        accumulated.preselectedCandidates +
-        accumulated.selectedCandidates +
-        accumulated.finalistCandidates;
-
-      const finishedRecruitmentProcesses =
-        accumulated.finishedRecruitmentProcesses;
-
-      setDashboardMetrics({
-        openVacancies: Math.max(vacancies.length - finishedRecruitmentProcesses, 0),
-        availableCandidates:
-          availableCandidatesCount > 0
-            ? availableCandidatesCount
-            : candidatePool.length,
-        preselectedCandidates: accumulated.preselectedCandidates,
-        selectedCandidates: accumulated.selectedCandidates,
-        finalistCandidates: accumulated.finalistCandidates,
-        finishedRecruitmentProcesses,
-      });
-    } catch (error) {
-      console.warn('No se pudieron calcular metricas del dashboard', error);
-      setDashboardMetrics(INITIAL_DASHBOARD_METRICS);
-    } finally {
-      setLoadingDashboardMetrics(false);
-    }
-  };
 
   const loadVacancyPipeline = async (vacancyId: string) => {
     if (!vacancyId) {
@@ -1316,7 +1316,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
   };
 
   const shareWorkshopByWhatsApp = (courseTitle: string, url: string) => {
-    const message = `Te comparto el taller \"${courseTitle}\": ${url}`;
+    const message = `Te comparto el taller "${courseTitle}": ${url}`;
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank', 'noopener,noreferrer');
   };
@@ -1324,7 +1324,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
   const shareWorkshopByEmail = (courseTitle: string, url: string) => {
     const subject = encodeURIComponent(`Invitacion al taller: ${courseTitle}`);
     const body = encodeURIComponent(
-      `Hola,\n\nTe comparto el acceso al taller \"${courseTitle}\":\n${url}\n\nSaludos.`,
+      `Hola,\n\nTe comparto el acceso al taller "${courseTitle}":\n${url}\n\nSaludos.`,
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
