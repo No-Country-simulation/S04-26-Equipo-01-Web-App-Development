@@ -1,4 +1,4 @@
-import api from '../feactures/api/axiosInterface';
+import api from '../features/api/axiosInterface';
 import type { RegisterDto, LoginDto, LoginResponse } from '../types/auth.types';
 import { throwBackendError } from './api-error';
 
