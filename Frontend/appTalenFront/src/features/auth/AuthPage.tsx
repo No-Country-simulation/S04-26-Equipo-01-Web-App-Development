@@ -166,6 +166,11 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
     return Object.keys(nextErrors).length === 0;
   };
 
+  const handleSocialLogin = (provider: 'google' | 'linkedin') => {
+    const apiRole = role === 'talento' ? 'talent' : 'company';
+    window.location.href = `${apiBaseUrl}/auth/${provider}?role=${apiRole}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -341,7 +346,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
             startIcon={<Google />} 
             fullWidth 
             sx={{ borderColor: '#2D3748', color: '#2D3748' }}
-            onClick={() => window.location.href = `${apiBaseUrl}/auth/google`}
+            onClick={() => handleSocialLogin('google')}
           >
             Google
           </Button>
@@ -350,7 +355,7 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
             startIcon={<LinkedIn />} 
             fullWidth 
             sx={{ borderColor: '#0A66C2', color: '#0A66C2' }}
-            onClick={() => window.location.href = `${apiBaseUrl}/auth/linkedin`}
+            onClick={() => handleSocialLogin('linkedin')}
           >
             LinkedIn
           </Button>

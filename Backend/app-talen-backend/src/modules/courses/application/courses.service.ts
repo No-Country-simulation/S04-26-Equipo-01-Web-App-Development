@@ -317,6 +317,7 @@ export class CoursesService {
       courseId,
       url: addMeetingLinkDto.url,
       platform: addMeetingLinkDto.platform,
+      scheduledAt: new Date(addMeetingLinkDto.scheduledAt),
       password: addMeetingLinkDto.password,
       notes: addMeetingLinkDto.notes,
       addedBy: authUser.userId,

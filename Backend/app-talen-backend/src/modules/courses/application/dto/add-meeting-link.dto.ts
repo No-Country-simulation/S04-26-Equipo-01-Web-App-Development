@@ -1,4 +1,10 @@
-import { IsString, IsEnum, IsOptional, IsUrl } from 'class-validator';
+import {
+  IsDateString,
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsUrl,
+} from 'class-validator';
 import { MeetingPlatform } from '../../domain/meeting-platform.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -24,6 +30,16 @@ export class AddMeetingLinkDto {
     message: 'platform must be one of: GOOGLE_MEET, ZOOM, TEAMS, OTHER',
   })
   platform!: MeetingPlatform;
+
+  @ApiProperty({
+    description: 'Scheduled date and time of the workshop in ISO 8601 format',
+    example: '2026-06-15T19:00:00.000Z',
+  })
+  @IsDateString(
+    {},
+    { message: 'scheduledAt must be a valid ISO 8601 datetime' },
+  )
+  scheduledAt!: string;
 
   @ApiPropertyOptional({ description: 'Password for the meeting if any' })
   @IsOptional()

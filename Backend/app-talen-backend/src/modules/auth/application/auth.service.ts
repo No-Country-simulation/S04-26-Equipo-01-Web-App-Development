@@ -82,18 +82,22 @@ export class AuthService {
 
   async loginWithExternalProvider(
     profile: ExternalProfileDto,
-    defaultRole: UserRole = UserRole.TALENT,
   ): Promise<AuthResponse> {
     const email = this.normalizeEmail(profile.email);
     let user = await this.usersRepository.findOne({ where: { email } });
 
     if (!user) {
+      const rawRole = profile.role ? profile.role.toUpperCase() : '';
+      if (!Object.values(UserRole).includes(rawRole as UserRole)) {
+        throw new UnauthorizedException('Invalid request: Invalid user');
+      }
       const hashedPassword = await bcrypt.hash(profile.email, 10);
+      const assignedRole = rawRole as UserRole;
       user = this.usersRepository.create({
         email,
         password: hashedPassword,
         imageUrl: profile.picture,
-        role: defaultRole,
+        role: assignedRole,
       });
       user = await this.usersRepository.save(user);
     }

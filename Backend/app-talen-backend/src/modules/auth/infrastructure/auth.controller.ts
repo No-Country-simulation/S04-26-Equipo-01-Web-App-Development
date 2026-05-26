@@ -4,11 +4,11 @@ import {
   Get,
   Post,
   Req,
+  Res,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from '../application/auth.service';
 import { LoginDto } from '../application/dto/login.dto';
 import { RegisterDto } from '../application/dto/register.dto';
@@ -18,6 +18,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from './types/authenticated-request.type';
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
+import type { Response } from 'express';
 import { ExternalProfileDto } from '../application/dto/external-profile.dto';
 import {
   ApiBearerAuth,
@@ -26,6 +27,9 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { LinkedInAuthGuard } from './guards/linkedin-auth.guard';
+import { ConfigService } from 'node_modules/@nestjs/config';
 
 export const GetUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): ExternalProfileDto => {
@@ -39,7 +43,10 @@ export const GetUser = createParamDecorator(
 @ApiTags('Autenticación')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private configService: ConfigService,
+  ) {}
 
   @Post('register')
   @ApiOperation({
@@ -93,7 +100,7 @@ export class AuthController {
     summary: 'Iniciar autenticación con LinkedIn',
     description: 'Redirige al usuario para autenticarse con LinkedIn.',
   })
-  @UseGuards(AuthGuard('linkedin'))
+  @UseGuards(LinkedInAuthGuard)
   linkedinAuth(): void {}
 
   @Get('linkedin/callback')
@@ -102,9 +109,17 @@ export class AuthController {
     description:
       'Callback para autenticación con LinkedIn. No requiere prueba manual.',
   })
-  @UseGuards(AuthGuard('linkedin'))
-  async linkedinAuthRedirect(@GetUser() user: ExternalProfileDto) {
-    return this.authService.loginWithExternalProvider(user);
+  @UseGuards(LinkedInAuthGuard)
+  async linkedinAuthRedirect(
+    @GetUser() user: ExternalProfileDto,
+    @Res() res: Response,
+  ) {
+    const authResponse = await this.authService.loginWithExternalProvider(user);
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    return res.redirect(
+      `${frontendUrl}/login-success?token=${authResponse.accessToken}`,
+    );
   }
 
   @Get('google')
@@ -112,7 +127,7 @@ export class AuthController {
     summary: 'Iniciar autenticación con Google',
     description: 'Redirige al usuario para autenticarse con Google.',
   })
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleAuthGuard)
   googleAuth(): void {}
 
   @Get('google/callback')
@@ -121,8 +136,16 @@ export class AuthController {
     description:
       'Callback para autenticación con Google. No requiere prueba manual.',
   })
-  @UseGuards(AuthGuard('google'))
-  async googleAuthRedirect(@GetUser() user: ExternalProfileDto) {
-    return this.authService.loginWithExternalProvider(user);
+  @UseGuards(GoogleAuthGuard)
+  async googleAuthRedirect(
+    @GetUser() user: ExternalProfileDto,
+    @Res() res: Response,
+  ) {
+    const authResponse = await this.authService.loginWithExternalProvider(user);
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    return res.redirect(
+      `${frontendUrl}/login-success?token=${authResponse.accessToken}`,
+    );
   }
 }

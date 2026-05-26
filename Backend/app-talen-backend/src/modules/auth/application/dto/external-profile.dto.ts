@@ -4,4 +4,5 @@ export class ExternalProfileDto {
   firstName!: string;
   lastName!: string;
   picture?: string;
+  role?: string;
 }
