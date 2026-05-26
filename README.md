@@ -5,12 +5,15 @@ App Talen es una plataforma web para conectar talento, empresas y formacion prof
 ## Contenido
 
 - [Stack tecnico](#stack-tecnico)
+- [Arquitectura](#arquitectura)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Primeros pasos](#primeros-pasos)
 - [Variables de entorno](#variables-de-entorno)
 - [Levantar con Docker](#levantar-con-docker)
 - [Levantar en desarrollo local](#levantar-en-desarrollo-local)
 - [Rutas principales](#rutas-principales)
+- [CI/CD](#cicd)
+- [Runbook operativo](#runbook-operativo)
 - [Comandos utiles](#comandos-utiles)
 - [Documentacion adicional](#documentacion-adicional)
 
@@ -40,6 +43,55 @@ Infraestructura local:
 - Docker Compose
 - PostgreSQL 16
 - Nginx para servir el build del frontend
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+  user[Usuario web] --> nginx[Nginx / Vite frontend]
+  nginx --> react[React app]
+  react --> apiClient[Axios services]
+  apiClient --> nest[NestJS API]
+
+  subgraph frontend[Frontend: React + Vite]
+    react --> routes[React Router]
+    routes --> landing[Landing]
+    routes --> authUI[Auth]
+    routes --> talentUI[Talent Dashboard]
+    routes --> companyUI[Company Dashboard]
+    routes --> adminUI[Admin Dashboard]
+    routes --> academyUI[Academia Pro]
+  end
+
+  subgraph backend[Backend: NestJS]
+    nest --> auth[Auth Module]
+    nest --> profiles[Profiles Module]
+    nest --> skills[Skills Module]
+    nest --> assessments[Assessment Module]
+    nest --> learning[Learning Module]
+    nest --> marketplace[Marketplace / Recruiter Module]
+    nest --> courses[Courses Module]
+    nest --> companies[Companies Module]
+    nest --> swagger[Swagger Docs]
+  end
+
+  auth --> jwt[JWT]
+  auth --> oauth[Google / LinkedIn OAuth]
+  profiles --> ai[AI / CV analysis]
+  assessments --> ai
+  courses --> db[(PostgreSQL)]
+  companies --> db
+  marketplace --> db
+  learning --> db
+  assessments --> db
+  skills --> db
+  profiles --> db
+  auth --> db
+
+  docker[Docker Compose] -. levanta .-> nginx
+  docker -. levanta .-> nest
+  docker -. levanta .-> db
+```
 
 ## Estructura del repositorio
 
@@ -194,6 +246,76 @@ Backend:
 | Courses | `/courses` |
 
 La documentacion interactiva de endpoints esta en Swagger: `http://localhost:3000/docs`.
+
+## CI/CD
+
+El proyecto utiliza GitHub Actions para validar cambios antes de integrarlos.
+
+El workflow esta definido en `.github/workflows/ci.yml` y se ejecuta en `push` y `pull_request` hacia `main` y `develop`.
+
+Checks esperados:
+
+- Instalacion de dependencias frontend/backend
+- Lint frontend/backend
+- Build frontend/backend
+- Tests backend
+- Tests frontend si existe script configurado
+
+Durante CI se levanta un servicio PostgreSQL 16 para validar los tests e2e del backend.
+
+## Runbook operativo
+
+### Problema: el frontend no conecta con backend
+
+Verificar:
+
+1. `VITE_API_URL` en Vercel o en el entorno donde se buildea el frontend. Debe apuntar a la URL publica del backend, sin `/api` si el backend mantiene las rutas actuales.
+2. `CORS_ORIGIN` en Render o en el entorno del backend. Debe permitir el dominio del frontend.
+3. Backend activo en Render o en la plataforma usada para desplegar la API.
+4. Endpoint de salud. Si se implementa `/health`, usarlo como check principal; con el estado actual tambien se puede validar `GET /` o abrir `/docs`.
+5. Errores en consola del navegador y en la pestana Network: revisar status HTTP, URL final, preflight CORS y respuesta del backend.
+6. Token JWT en `localStorage` si el endpoint requiere autenticacion.
+
+### Problema: errores de base de datos
+
+Verificar:
+
+1. Variables de conexion: `DATABASE_URL` si el deploy la usa, o `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD` y `DB_DATABASE` si se usan variables separadas.
+2. Migraciones aplicadas o, en desarrollo, `TYPEORM_SYNC=true`.
+3. Conexion desde backend hacia PostgreSQL: host, puerto, credenciales, SSL y permisos de red.
+4. Logs de Render o de la plataforma donde corre el backend.
+5. Estado de la base de datos: disponibilidad, limite de conexiones y espacio disponible.
+6. Entidades TypeORM y cambios recientes en modelos que puedan requerir migracion.
+
+### Problema: login o registro fallan
+
+Verificar:
+
+1. `JWT_SECRET` configurado en backend.
+2. `JWT_EXPIRES_IN` con un valor valido, por ejemplo `7d`.
+3. Payload enviado desde frontend a `/auth/login` o `/auth/register`.
+4. Usuario existente, rol valido (`TALENT`, `COMPANY`, `ADMIN`) y password correcta.
+5. Respuestas `401` o `400` en Network y logs del backend.
+
+### Problema: OAuth Google o LinkedIn no funciona
+
+Verificar:
+
+1. `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`, o `LINKEDIN_CLIENT_ID` y `LINKEDIN_CLIENT_SECRET`.
+2. Callback URL configurada en el proveedor OAuth.
+3. URL publica del backend usada por el proveedor.
+4. Logs del backend durante el callback.
+5. CORS y cookies/sesion si el flujo depende del navegador.
+
+### Problema: Docker Compose no levanta
+
+Verificar:
+
+1. `.env` creado desde `.env.example`.
+2. Puerto `3000`, `8080` o `5434` libre en la maquina local.
+3. Estado de PostgreSQL con `docker compose ps`.
+4. Logs por servicio con `docker compose logs api`, `docker compose logs frontend` o `docker compose logs postgres`.
+5. Rebuild limpio con `docker compose up --build` si cambiaron dependencias o variables de build del frontend.
 
 ## Comandos utiles
 
