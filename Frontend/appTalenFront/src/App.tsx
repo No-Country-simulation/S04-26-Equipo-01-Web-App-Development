@@ -3,14 +3,6 @@ import { useState, useCallback } from 'react';
 import { Box, CssBaseline } from '@mui/material';
 import { Navbar } from './layout/Navbar';
 import { Footer } from './layout/Footer';
-<<<<<<< HEAD
-import { LandingPage } from './features/landing/LandingPage';
-import { AuthPage } from './features/auth/AuthPage.tsx';
-import { TalentDashboard } from './features/profile/TalentDashboard.tsx';
-import { CompanyDashboard } from './features/marketplace/CompanyDashboard.tsx';
-import { AdminDashboard } from './features/admin/AdminDashboard.tsx';
-import { AcademyPro } from './features/academy/AcademyPro.tsx';
-=======
 import { LandingPage } from './feactures/landing/LandingPage';
 import { AuthPage } from './feactures/auth/AuthPage.tsx';
 import { TalentDashboard } from './feactures/profile/TalentDashboard';
@@ -18,7 +10,6 @@ import { CompanyDashboard } from './feactures/marketplace/CompanyDashboard';
 import { AdminDashboard } from './feactures/admin/AdminDashboard';
 import { AcademyPro } from './feactures/academy/AcademyPro.tsx';
 import { LoginSuccess } from './feactures/auth/LoginSuccess';
->>>>>>> develop
 import { getStoredAuthUser, loginAdmin } from './utils/admin-auth';
 import type { AuthUser } from './types/auth.types';
 
