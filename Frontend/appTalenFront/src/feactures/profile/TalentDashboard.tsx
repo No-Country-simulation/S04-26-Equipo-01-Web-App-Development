@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { 
   Box, 
   Typography, 
@@ -312,6 +312,10 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   const hasTechnicalSkillsPersisted = profileSkills.some(
     (userSkill) => userSkill.skill?.category?.toLowerCase().includes('technical') ?? false,
   );
+  const hasTechnicalSkillsInCvDraft = (cvFormData?.skills.technical ?? []).some(
+    (skill) => skill.trim().length > 0,
+  );
+  const canConfirmSkillsAndContinue = hasTechnicalSkillsPersisted || hasTechnicalSkillsInCvDraft;
   const hasVerifiedSkills = hasSkillsGenerated && skillsVerified;
   const hasRoadmapGenerated = learningPaths.length > 0;
   const hasPsychotechnicalResults = assessmentTestResults.some(
@@ -334,6 +338,26 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   const coursesInProgress = learningPaths
     .flatMap((path) => path.modules ?? [])
     .filter((module) => module.progress?.[0]?.status === 'IN_PROGRESS').length;
+
+  const learningCoursesForCv = useMemo(() => {
+    const modules = learningPaths.flatMap((path) =>
+      (path.modules ?? []).map((module) => ({
+        id: module.id,
+        title: module.title,
+        status: module.progress?.[0]?.status ?? 'PENDING',
+      })),
+    );
+
+    const viewed = modules.filter(
+      (module) => module.status === 'IN_PROGRESS' || module.status === 'COMPLETED',
+    );
+    const approved = modules.filter((module) => module.status === 'COMPLETED');
+
+    return {
+      viewed,
+      approved,
+    };
+  }, [learningPaths]);
 
   const validatedSkills = `+${profileSkills.length}`;
 
@@ -1685,6 +1709,56 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                       </Box>
                     </Box>
                   </Box>
+
+                  <Box sx={{ mt: 2.2, p: 2, borderRadius: 2, border: '1px solid #C9D7E8', bgcolor: '#F9FCFF' }}>
+                    <Typography sx={{ fontWeight: 700, color: '#1F3E69', mb: 1.5 }}>
+                      Formacion y Cursos
+                    </Typography>
+
+                    <Box sx={{ display: 'grid', gap: 1.5 }}>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.9rem', color: '#6E819A', fontWeight: 700, mb: 0.8 }}>
+                          Cursos vistos ({learningCoursesForCv.viewed.length})
+                        </Typography>
+                        {learningCoursesForCv.viewed.length > 0 ? (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                            {learningCoursesForCv.viewed.map((course) => (
+                              <Chip
+                                key={`cv-viewed-course-${course.id}`}
+                                label={course.title}
+                                sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }}
+                              />
+                            ))}
+                          </Box>
+                        ) : (
+                          <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>
+                            Aun no tienes cursos vistos.
+                          </Typography>
+                        )}
+                      </Box>
+
+                      <Box>
+                        <Typography sx={{ fontSize: '0.9rem', color: '#6E819A', fontWeight: 700, mb: 0.8 }}>
+                          Cursos aprobados ({learningCoursesForCv.approved.length})
+                        </Typography>
+                        {learningCoursesForCv.approved.length > 0 ? (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                            {learningCoursesForCv.approved.map((course) => (
+                              <Chip
+                                key={`cv-approved-course-${course.id}`}
+                                label={course.title}
+                                sx={{ bgcolor: '#E8F5E9', color: '#1B5E20', fontWeight: 600 }}
+                              />
+                            ))}
+                          </Box>
+                        ) : (
+                          <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>
+                            Aun no tienes cursos aprobados.
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  </Box>
                 </Box>
               ) : (
                 <Box sx={{ mt: 3, p: 2, bgcolor: '#FFF3E0', borderRadius: 2, border: '1px solid #FFB74D' }}>
@@ -2115,7 +2189,7 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                       <Button
                         variant="contained"
                         onClick={handleConfirmSkillsAndContinue}
-                        disabled={!hasSkillsGenerated || isConfirmingSkills}
+                        disabled={!canConfirmSkillsAndContinue || isConfirmingSkills}
                         sx={{
                           bgcolor: '#173A68',
                           color: '#fff',
@@ -2127,9 +2201,9 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                           ? 'GUARDANDO Y ABRIENDO PRUEBA TECNICA...'
                           : 'CONFIRMAR SKILLS Y CONTINUAR A PRUEBA TECNICA'}
                       </Button>
-                      {!hasTechnicalSkillsPersisted && !isConfirmingSkills && (
+                      {!canConfirmSkillsAndContinue && !isConfirmingSkills && (
                         <Typography sx={{ color: '#B42318', fontWeight: 600, alignSelf: 'center' }}>
-                          Para continuar necesitas al menos una skill tecnica guardada.
+                          Para continuar necesitas al menos una skill tecnica detectada en CV o guardada en backend.
                         </Typography>
                       )}
                     </Box>

@@ -11,7 +11,9 @@ import {
 } from '@mui/material';
 import { AutoAwesomeOutlined } from '@mui/icons-material';
 import { consolidateMyAssessment } from '../services/assessment.service';
+import { listCourses } from '../services/course.service';
 import { generateMyLearningPath, getMyLearningPaths } from '../services/learning.service';
+import type { Course } from '../types/course.types';
 import type { LearningModule, LearningPath, ModuleStatus } from '../types/learning.types';
 
 interface LearningRoadmapPanelProps {
@@ -42,6 +44,7 @@ const filterModulesByMode = (
 
 export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPanelProps) => {
   const [learningPaths, setLearningPaths] = useState<LearningPath[]>([]);
+  const [publishedCourses, setPublishedCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
@@ -56,18 +59,31 @@ export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPane
     }
   };
 
+  const fetchPublishedCourses = async (): Promise<Course[]> => {
+    try {
+      return await listCourses({ published: true });
+    } catch (error) {
+      console.error('Error loading published courses:', error);
+      return [];
+    }
+  };
+
   const loadLearningPaths = async () => {
     const paths = await fetchLearningPaths();
     setLearningPaths(paths);
+
+    const courses = await fetchPublishedCourses();
+    setPublishedCourses(courses);
   };
 
   useEffect(() => {
     let isActive = true;
 
-    void fetchLearningPaths()
-      .then((paths) => {
+    void Promise.all([fetchLearningPaths(), fetchPublishedCourses()])
+      .then(([paths, courses]) => {
         if (isActive) {
           setLearningPaths(paths);
+          setPublishedCourses(courses);
         }
       })
       .finally(() => {
@@ -111,6 +127,87 @@ export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPane
     return filterModulesByMode(latestPath.modules, mode);
   }, [latestPath, mode]);
 
+  const scheduledWorkshops = useMemo(
+    () =>
+      publishedCourses.flatMap((course) =>
+        (course.meetingLinks ?? []).map((meetingLink) => ({
+          id: meetingLink.id,
+          courseId: course.id,
+          courseTitle: course.title,
+          courseDescription: course.description,
+          url: meetingLink.url,
+          platform: meetingLink.platform,
+          scheduledAt: meetingLink.scheduledAt ?? null,
+          notes: meetingLink.notes,
+        })),
+      ),
+    [publishedCourses],
+  );
+
+  const workshopsByMode = useMemo(() => {
+    const now = new Date();
+
+    return scheduledWorkshops.filter((workshop) => {
+      if (!workshop.scheduledAt) {
+        return mode === 'pending' || mode === 'all';
+      }
+
+      const scheduledDate = new Date(workshop.scheduledAt);
+      if (Number.isNaN(scheduledDate.getTime())) {
+        return mode === 'pending' || mode === 'all';
+      }
+
+      if (mode === 'all') {
+        return true;
+      }
+
+      if (mode === 'pending') {
+        return scheduledDate > now;
+      }
+
+      if (mode === 'in-progress') {
+        const diffMs = Math.abs(scheduledDate.getTime() - now.getTime());
+        const threeHoursMs = 3 * 60 * 60 * 1000;
+        return diffMs <= threeHoursMs;
+      }
+
+      return scheduledDate < now;
+    });
+  }, [scheduledWorkshops, mode]);
+
+  const formatDateTime = (value?: string | null): string => {
+    if (!value) {
+      return 'Por programar';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return 'Por programar';
+    }
+
+    return parsed.toLocaleString('es-CO', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const openWorkshopRoom = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const copyWorkshopLink = async (url: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {
+      // noop
+    }
+  };
+
   const titleByMode: Record<LearningRoadmapPanelProps['mode'], string> = {
     all: 'Mi Ruta de Cursos',
     pending: 'Cursos Pendientes',
@@ -142,7 +239,7 @@ export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPane
       </Typography>
 
       <Typography sx={{ mt: 1.2, color: '#5C6F86', maxWidth: 820 }}>
-        Ruta recomendada en base a tu assessment consolidado y resultados de pruebas.
+        Ruta recomendada en base a tu assessment consolidado y cursos publicados disponibles para talento.
       </Typography>
 
       {mode === 'all' && (
@@ -250,6 +347,60 @@ export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPane
                   </Card>
                 );
               })}
+            </Box>
+          )}
+
+          <Typography sx={{ mt: 4, fontWeight: 800, color: '#1F3E69', fontSize: '1.1rem' }}>
+            Talleres Programados (Cursos Publicados)
+          </Typography>
+
+          {workshopsByMode.length === 0 ? (
+            <Box sx={{ mt: 1.5, p: 2, bgcolor: '#F8FAFC', borderRadius: 2, border: '1px solid #D8E3F0' }}>
+              <Typography sx={{ color: '#5C6F86', fontWeight: 600 }}>
+                No hay talleres disponibles para este filtro.
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ mt: 2, display: 'grid', gap: 1.2 }}>
+              {workshopsByMode.map((workshop) => (
+                <Card key={workshop.id} sx={{ border: '1px solid #D8E3F0' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 2, flexWrap: 'wrap' }}>
+                      <Box>
+                        <Typography sx={{ fontWeight: 700, color: '#1F3E69' }}>
+                          {workshop.courseTitle}
+                        </Typography>
+                        <Typography sx={{ mt: 0.5, color: '#5C6F86' }}>
+                          {workshop.courseDescription || 'Taller de curso publicado'}
+                        </Typography>
+                        <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          <Chip label={`Plataforma: ${workshop.platform}`} sx={{ bgcolor: '#E3F2FD', color: '#1565C0' }} />
+                          <Chip label={`Fecha: ${formatDateTime(workshop.scheduledAt)}`} sx={{ bgcolor: '#FFF3E0', color: '#E65100' }} />
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="contained"
+                          onClick={() => openWorkshopRoom(workshop.url)}
+                          sx={{ textTransform: 'none', bgcolor: '#1F3E69', '&:hover': { bgcolor: '#1D3C63' } }}
+                        >
+                          Entrar a sala
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          onClick={() => {
+                            void copyWorkshopLink(workshop.url);
+                          }}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Copiar enlace
+                        </Button>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
             </Box>
           )}
         </>
