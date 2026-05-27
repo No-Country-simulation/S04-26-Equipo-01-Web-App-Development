@@ -272,13 +272,13 @@ export class ProfilesService {
 
     const manualExtractedText = payload.extractedText?.trim() ?? '';
 
-    return {
+    return await Promise.resolve({
       sourceUrl: payload.linkedinUrl?.trim() || 'linkedin_disabled',
       extractedText: manualExtractedText,
       extractedTextLength: manualExtractedText.length,
       summary:
         'La importacion de CV desde LinkedIn esta deshabilitada temporalmente. Usa la carga de CV por PDF o texto.',
-    };
+    });
   }
 
   private async findMyProfile(userId: string): Promise<Profile> {
@@ -588,7 +588,11 @@ export class ProfilesService {
       return WorkModality.VIRTUAL;
     }
 
-    if (lower.includes('hibrido') || lower.includes('híbrido') || lower.includes('hybrid')) {
+    if (
+      lower.includes('hibrido') ||
+      lower.includes('híbrido') ||
+      lower.includes('hybrid')
+    ) {
       return WorkModality.HIBRIDO;
     }
 
@@ -625,7 +629,9 @@ export class ProfilesService {
       roles.push(InterestedRole.BACKEND_DEVELOPER);
     }
 
-    if (/(frontend|react|angular|vue|javascript|typescript|css|html)/i.test(lower)) {
+    if (
+      /(frontend|react|angular|vue|javascript|typescript|css|html)/i.test(lower)
+    ) {
       roles.push(InterestedRole.FRONTEND_DEVELOPER);
     }
 
@@ -665,8 +671,16 @@ export class ProfilesService {
       { term: 'react', category: 'technical', normalizedName: 'react' },
       { term: 'angular', category: 'technical', normalizedName: 'angular' },
       { term: 'vue', category: 'technical', normalizedName: 'vue' },
-      { term: 'javascript', category: 'technical', normalizedName: 'javascript' },
-      { term: 'typescript', category: 'technical', normalizedName: 'typescript' },
+      {
+        term: 'javascript',
+        category: 'technical',
+        normalizedName: 'javascript',
+      },
+      {
+        term: 'typescript',
+        category: 'technical',
+        normalizedName: 'typescript',
+      },
       { term: 'node', category: 'technical', normalizedName: 'node.js' },
       { term: 'python', category: 'technical', normalizedName: 'python' },
       { term: 'java', category: 'technical', normalizedName: 'java' },
@@ -674,7 +688,11 @@ export class ProfilesService {
       { term: 'excel', category: 'technical', normalizedName: 'excel' },
       { term: 'power bi', category: 'technical', normalizedName: 'power bi' },
       { term: 'tableau', category: 'technical', normalizedName: 'tableau' },
-      { term: 'contabilidad', category: 'technical', normalizedName: 'contabilidad' },
+      {
+        term: 'contabilidad',
+        category: 'technical',
+        normalizedName: 'contabilidad',
+      },
       {
         term: 'contabilidad general',
         category: 'technical',
@@ -699,8 +717,16 @@ export class ProfilesService {
       },
       { term: 'finanzas', category: 'technical', normalizedName: 'finanzas' },
       { term: 'sap', category: 'technical', normalizedName: 'sap' },
-      { term: 'facturacion', category: 'technical', normalizedName: 'facturacion' },
-      { term: 'facturación', category: 'technical', normalizedName: 'facturacion' },
+      {
+        term: 'facturacion',
+        category: 'technical',
+        normalizedName: 'facturacion',
+      },
+      {
+        term: 'facturación',
+        category: 'technical',
+        normalizedName: 'facturacion',
+      },
       { term: 'tesoreria', category: 'technical', normalizedName: 'tesoreria' },
       { term: 'tesorería', category: 'technical', normalizedName: 'tesoreria' },
       {
@@ -713,11 +739,27 @@ export class ProfilesService {
         category: 'technical',
         normalizedName: 'conciliacion bancaria',
       },
-      { term: 'retenciones', category: 'technical', normalizedName: 'retenciones' },
+      {
+        term: 'retenciones',
+        category: 'technical',
+        normalizedName: 'retenciones',
+      },
       { term: 'niif', category: 'technical', normalizedName: 'niif' },
-      { term: 'profit plus', category: 'technical', normalizedName: 'profit plus' },
-      { term: 'erp profit plus', category: 'technical', normalizedName: 'erp profit plus' },
-      { term: 'quickbooks', category: 'technical', normalizedName: 'quickbooks' },
+      {
+        term: 'profit plus',
+        category: 'technical',
+        normalizedName: 'profit plus',
+      },
+      {
+        term: 'erp profit plus',
+        category: 'technical',
+        normalizedName: 'erp profit plus',
+      },
+      {
+        term: 'quickbooks',
+        category: 'technical',
+        normalizedName: 'quickbooks',
+      },
       {
         term: 'auxiliar administrativo',
         category: 'technical',
@@ -764,12 +806,28 @@ export class ProfilesService {
         category: 'technical',
         normalizedName: 'atencion al cliente',
       },
-      { term: 'paquete office', category: 'technical', normalizedName: 'paquete office' },
+      {
+        term: 'paquete office',
+        category: 'technical',
+        normalizedName: 'paquete office',
+      },
       { term: 'word', category: 'technical', normalizedName: 'word' },
       { term: 'excel', category: 'technical', normalizedName: 'excel' },
-      { term: 'powerpoint', category: 'technical', normalizedName: 'powerpoint' },
-      { term: 'historia clinica', category: 'technical', normalizedName: 'historia clinica' },
-      { term: 'historia clínica', category: 'technical', normalizedName: 'historia clinica' },
+      {
+        term: 'powerpoint',
+        category: 'technical',
+        normalizedName: 'powerpoint',
+      },
+      {
+        term: 'historia clinica',
+        category: 'technical',
+        normalizedName: 'historia clinica',
+      },
+      {
+        term: 'historia clínica',
+        category: 'technical',
+        normalizedName: 'historia clinica',
+      },
       { term: 'medico', category: 'technical', normalizedName: 'medicina' },
       { term: 'médico', category: 'technical', normalizedName: 'medicina' },
       {
@@ -779,7 +837,11 @@ export class ProfilesService {
       },
       { term: 'triaje', category: 'technical', normalizedName: 'triaje' },
       { term: 'triage', category: 'technical', normalizedName: 'triaje' },
-      { term: 'consulta externa', category: 'technical', normalizedName: 'consulta externa' },
+      {
+        term: 'consulta externa',
+        category: 'technical',
+        normalizedName: 'consulta externa',
+      },
       {
         term: 'diagnostico medico',
         category: 'technical',
@@ -790,12 +852,36 @@ export class ProfilesService {
         category: 'technical',
         normalizedName: 'diagnostico medico',
       },
-      { term: 'signos vitales', category: 'technical', normalizedName: 'signos vitales' },
-      { term: 'farmacologia', category: 'technical', normalizedName: 'farmacologia' },
-      { term: 'farmacología', category: 'technical', normalizedName: 'farmacologia' },
-      { term: 'primeros auxilios', category: 'technical', normalizedName: 'primeros auxilios' },
-      { term: 'enfermeria', category: 'technical', normalizedName: 'enfermeria' },
-      { term: 'enfermería', category: 'technical', normalizedName: 'enfermeria' },
+      {
+        term: 'signos vitales',
+        category: 'technical',
+        normalizedName: 'signos vitales',
+      },
+      {
+        term: 'farmacologia',
+        category: 'technical',
+        normalizedName: 'farmacologia',
+      },
+      {
+        term: 'farmacología',
+        category: 'technical',
+        normalizedName: 'farmacologia',
+      },
+      {
+        term: 'primeros auxilios',
+        category: 'technical',
+        normalizedName: 'primeros auxilios',
+      },
+      {
+        term: 'enfermeria',
+        category: 'technical',
+        normalizedName: 'enfermeria',
+      },
+      {
+        term: 'enfermería',
+        category: 'technical',
+        normalizedName: 'enfermeria',
+      },
       {
         term: 'diagnostico clinico',
         category: 'technical',
@@ -816,11 +902,31 @@ export class ProfilesService {
         category: 'technical',
         normalizedName: 'mantenimiento correctivo',
       },
-      { term: 'electromecanica', category: 'technical', normalizedName: 'electromecanica' },
-      { term: 'electromecánica', category: 'technical', normalizedName: 'electromecanica' },
-      { term: 'electricidad', category: 'technical', normalizedName: 'electricidad' },
-      { term: 'instrumentacion', category: 'technical', normalizedName: 'instrumentacion' },
-      { term: 'instrumentación', category: 'technical', normalizedName: 'instrumentacion' },
+      {
+        term: 'electromecanica',
+        category: 'technical',
+        normalizedName: 'electromecanica',
+      },
+      {
+        term: 'electromecánica',
+        category: 'technical',
+        normalizedName: 'electromecanica',
+      },
+      {
+        term: 'electricidad',
+        category: 'technical',
+        normalizedName: 'electricidad',
+      },
+      {
+        term: 'instrumentacion',
+        category: 'technical',
+        normalizedName: 'instrumentacion',
+      },
+      {
+        term: 'instrumentación',
+        category: 'technical',
+        normalizedName: 'instrumentacion',
+      },
       { term: 'autocad', category: 'technical', normalizedName: 'autocad' },
       { term: 'mecanica', category: 'technical', normalizedName: 'mecanica' },
       { term: 'mecánica', category: 'technical', normalizedName: 'mecanica' },
@@ -845,8 +951,16 @@ export class ProfilesService {
         normalizedName: 'mantenimiento mecanico',
       },
       { term: 'soldadura', category: 'technical', normalizedName: 'soldadura' },
-      { term: 'metrologia', category: 'technical', normalizedName: 'metrologia' },
-      { term: 'metrología', category: 'technical', normalizedName: 'metrologia' },
+      {
+        term: 'metrologia',
+        category: 'technical',
+        normalizedName: 'metrologia',
+      },
+      {
+        term: 'metrología',
+        category: 'technical',
+        normalizedName: 'metrologia',
+      },
       {
         term: 'logistica militar',
         category: 'technical',
@@ -887,12 +1001,32 @@ export class ProfilesService {
         category: 'technical',
         normalizedName: 'normativa castrense',
       },
-      { term: 'comunicacion', category: 'personal', normalizedName: 'comunicacion' },
-      { term: 'comunicación', category: 'personal', normalizedName: 'comunicacion' },
+      {
+        term: 'comunicacion',
+        category: 'personal',
+        normalizedName: 'comunicacion',
+      },
+      {
+        term: 'comunicación',
+        category: 'personal',
+        normalizedName: 'comunicacion',
+      },
       { term: 'liderazgo', category: 'personal', normalizedName: 'liderazgo' },
-      { term: 'trabajo en equipo', category: 'personal', normalizedName: 'trabajo en equipo' },
-      { term: 'proactivo', category: 'personal', normalizedName: 'proactividad' },
-      { term: 'proactiva', category: 'personal', normalizedName: 'proactividad' },
+      {
+        term: 'trabajo en equipo',
+        category: 'personal',
+        normalizedName: 'trabajo en equipo',
+      },
+      {
+        term: 'proactivo',
+        category: 'personal',
+        normalizedName: 'proactividad',
+      },
+      {
+        term: 'proactiva',
+        category: 'personal',
+        normalizedName: 'proactividad',
+      },
       {
         term: 'orientacion al detalle',
         category: 'personal',
@@ -903,9 +1037,21 @@ export class ProfilesService {
         category: 'personal',
         normalizedName: 'orientacion al detalle',
       },
-      { term: 'responsabilidad', category: 'personal', normalizedName: 'responsabilidad' },
-      { term: 'organizacion', category: 'personal', normalizedName: 'organizacion' },
-      { term: 'organización', category: 'personal', normalizedName: 'organizacion' },
+      {
+        term: 'responsabilidad',
+        category: 'personal',
+        normalizedName: 'responsabilidad',
+      },
+      {
+        term: 'organizacion',
+        category: 'personal',
+        normalizedName: 'organizacion',
+      },
+      {
+        term: 'organización',
+        category: 'personal',
+        normalizedName: 'organizacion',
+      },
       { term: 'empatia', category: 'personal', normalizedName: 'empatia' },
       { term: 'empatía', category: 'personal', normalizedName: 'empatia' },
       {

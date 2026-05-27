@@ -242,7 +242,8 @@ export class ProfilesController {
 
   @Post('me/cv/import-linkedin')
   @ApiOperation({
-    summary: 'Importar CV desde perfil de LinkedIn (deshabilitado temporalmente)',
+    summary:
+      'Importar CV desde perfil de LinkedIn (deshabilitado temporalmente)',
     description:
       'Este flujo está deshabilitado temporalmente. Mantiene compatibilidad con frontend mientras se prueba carga de CV por archivo.',
   })
@@ -252,7 +253,8 @@ export class ProfilesController {
   })
   @ApiResponse({
     status: 201,
-    description: 'Respuesta de compatibilidad cuando LinkedIn está deshabilitado.',
+    description:
+      'Respuesta de compatibilidad cuando LinkedIn está deshabilitado.',
     type: Object,
   })
   importMyCvFromLinkedIn(

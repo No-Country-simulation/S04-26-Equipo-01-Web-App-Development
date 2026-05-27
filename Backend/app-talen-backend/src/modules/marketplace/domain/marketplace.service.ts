@@ -365,8 +365,16 @@ export class MarketplaceService {
 
     const savedVacancy = await this.jobOpportunityRepository.save(vacancy);
 
-    await this.notifyVacancyCreated(savedVacancy.title, user.email, company.name);
-    await this.notifyTalentsNewVacancy(savedVacancy.title, company.name, user.id);
+    await this.notifyVacancyCreated(
+      savedVacancy.title,
+      user.email,
+      company.name,
+    );
+    await this.notifyTalentsNewVacancy(
+      savedVacancy.title,
+      company.name,
+      user.id,
+    );
 
     return {
       id: savedVacancy.id,
@@ -682,7 +690,10 @@ export class MarketplaceService {
     vacancyTitle: string,
     stage: PipelineStage,
   ): Promise<void> {
-    const stageMap: Record<PipelineStage, 'PREAPROBADO' | 'APROBADO' | 'SELECCIONADO'> = {
+    const stageMap: Record<
+      PipelineStage,
+      'PREAPROBADO' | 'APROBADO' | 'SELECCIONADO'
+    > = {
       SELECTED: 'PREAPROBADO',
       FINALIST: 'APROBADO',
       ACCEPTED: 'SELECCIONADO',
@@ -802,7 +813,9 @@ export class MarketplaceService {
 
     return applications
       .filter((application) => {
-        const normalizedStatus = this.normalizePipelineStatus(application.status);
+        const normalizedStatus = this.normalizePipelineStatus(
+          application.status,
+        );
         return (
           [
             ApplicationStatus.CONTACTED,

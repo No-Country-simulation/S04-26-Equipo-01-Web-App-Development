@@ -14,7 +14,13 @@ import { MailModule } from '../mail/mail.module';
   imports: [
     AuthModule,
     MailModule,
-    TypeOrmModule.forFeature([Course, CourseModule, MeetingLink, Company, User]),
+    TypeOrmModule.forFeature([
+      Course,
+      CourseModule,
+      MeetingLink,
+      Company,
+      User,
+    ]),
   ],
   controllers: [CoursesController],
   providers: [CoursesService],

@@ -134,12 +134,12 @@ export class AuthController {
     @Req() request: Request,
     @Res() response: Response,
   ) {
-      return this.handleOAuthCallback(
-        request,
-        response,
-        'linkedin',
-        'No se pudo completar el acceso con LinkedIn. Intenta nuevamente.',
-      );
+    return this.handleOAuthCallback(
+      request,
+      response,
+      'linkedin',
+      'No se pudo completar el acceso con LinkedIn. Intenta nuevamente.',
+    );
   }
 
   @Get('google')
@@ -156,16 +156,13 @@ export class AuthController {
     description:
       'Callback para autenticación con Google. No requiere prueba manual.',
   })
-  async googleAuthRedirect(
-    @Req() request: Request,
-    @Res() response: Response,
-  ) {
-      return this.handleOAuthCallback(
-        request,
-        response,
-        'google',
-        'No se pudo completar el acceso con Google. Intenta nuevamente.',
-      );
+  async googleAuthRedirect(@Req() request: Request, @Res() response: Response) {
+    return this.handleOAuthCallback(
+      request,
+      response,
+      'google',
+      'No se pudo completar el acceso con Google. Intenta nuevamente.',
+    );
   }
 
   private async handleOAuthCallback(
@@ -174,33 +171,49 @@ export class AuthController {
     strategy: 'google' | 'linkedin',
     genericErrorMessage: string,
   ): Promise<void> {
+    const authenticate = passport.authenticate.bind(passport) as (
+      strategyName: 'google' | 'linkedin',
+      options: { session: false },
+      callback: (
+        error: unknown,
+        user: ExternalProfileDto | false | null,
+      ) => Promise<void>,
+    ) => (req: Request, res: Response, next: (err?: unknown) => void) => void;
+
     await new Promise<void>((resolve) => {
-      passport.authenticate(
+      const middleware = authenticate(
         strategy,
         { session: false },
         async (error: unknown, user: ExternalProfileDto | false | null) => {
           if (error || !user) {
-            response.redirect(this.buildFrontendLoginErrorUrl(genericErrorMessage));
+            response.redirect(
+              this.buildFrontendLoginErrorUrl(genericErrorMessage),
+            );
             resolve();
             return;
           }
 
           try {
             const defaultRole = this.resolveOAuthRole(request.query.state);
-            const authResponse = await this.authService.loginWithExternalProvider(
-              user,
-              defaultRole,
-              strategy,
-            );
+            const authResponse =
+              await this.authService.loginWithExternalProvider(
+                user,
+                defaultRole,
+                strategy,
+              );
 
             response.redirect(this.buildFrontendOAuthRedirectUrl(authResponse));
             resolve();
           } catch {
-            response.redirect(this.buildFrontendLoginErrorUrl(genericErrorMessage));
+            response.redirect(
+              this.buildFrontendLoginErrorUrl(genericErrorMessage),
+            );
             resolve();
           }
         },
-      )(request, response);
+      );
+
+      middleware(request, response, () => undefined);
     });
   }
 
@@ -210,7 +223,7 @@ export class AuthController {
     }
 
     const normalizedState = state.toUpperCase();
-    if (normalizedState === UserRole.COMPANY) {
+    if (normalizedState === UserRole.COMPANY.toString()) {
       return UserRole.COMPANY;
     }
 
