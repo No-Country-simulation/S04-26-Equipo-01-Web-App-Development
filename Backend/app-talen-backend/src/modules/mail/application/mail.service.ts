@@ -41,7 +41,9 @@ export class MailService {
     }
 
     if (!this.isValidEmail(params.to)) {
-      this.logger.warn(`Invalid recipient email '${params.to}'. Skipping send.`);
+      this.logger.warn(
+        `Invalid recipient email '${params.to}'. Skipping send.`,
+      );
       return;
     }
 
@@ -99,7 +101,10 @@ export class MailService {
     return from.replace(/[\r\n]/g, ' ').trim();
   }
 
-  private buildPlainTextMessage(recipientName: string, frontendUrl: string): string {
+  private buildPlainTextMessage(
+    recipientName: string,
+    frontendUrl: string,
+  ): string {
     return [
       `Hola ${recipientName},`,
       '',

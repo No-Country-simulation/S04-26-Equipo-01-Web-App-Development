@@ -105,7 +105,10 @@ export class AuthService {
         role: assignedRole,
       });
       user = await this.usersRepository.save(user);
-      this.queueRegistrationConfirmation(user, this.buildRecipientName(profile));
+      this.queueRegistrationConfirmation(
+        user,
+        this.buildRecipientName(profile),
+      );
     }
 
     return this.buildAuthResponse(user);
@@ -150,7 +153,8 @@ export class AuthService {
   }
 
   private buildRecipientName(profile: ExternalProfileDto): string {
-    const fullName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
+    const fullName =
+      `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
 
     return fullName.length > 0 ? fullName : this.normalizeEmail(profile.email);
   }
@@ -165,7 +169,8 @@ export class AuthService {
         recipientName,
       })
       .catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : 'Unknown error';
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
         this.logger.warn(
           `Unable to send registration confirmation to ${user.email}: ${message}`,
         );
