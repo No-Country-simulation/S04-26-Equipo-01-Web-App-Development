@@ -92,3 +92,83 @@ Content-Type: application/pdf
 
 < ./cv.pdf
 --BoundaryCv--
+
+### Analyze CV - test file 1 (Backend)
+POST {{baseUrl}}/profiles/me/cv/analyze
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=BoundaryCv1
+
+--BoundaryCv1
+Content-Disposition: form-data; name="applyToProfile"
+
+false
+--BoundaryCv1
+Content-Disposition: form-data; name="file"; filename="cv-backend.pdf"
+Content-Type: application/pdf
+
+< ./cv-backend.pdf
+--BoundaryCv1--
+
+### Analyze CV - test file 2 (Frontend)
+POST {{baseUrl}}/profiles/me/cv/analyze
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=BoundaryCv2
+
+--BoundaryCv2
+Content-Disposition: form-data; name="applyToProfile"
+
+false
+--BoundaryCv2
+Content-Disposition: form-data; name="file"; filename="cv-frontend.pdf"
+Content-Type: application/pdf
+
+< ./cv-frontend.pdf
+--BoundaryCv2--
+
+### Analyze CV - test file 3 (Data)
+POST {{baseUrl}}/profiles/me/cv/analyze
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=BoundaryCv3
+
+--BoundaryCv3
+Content-Disposition: form-data; name="applyToProfile"
+
+false
+--BoundaryCv3
+Content-Disposition: form-data; name="file"; filename="cv-data.pdf"
+Content-Type: application/pdf
+
+< ./cv-data.pdf
+--BoundaryCv3--
+
+### Analyze CV - test file 4 (ATS template)
+POST {{baseUrl}}/profiles/me/cv/analyze
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=BoundaryCv4
+
+--BoundaryCv4
+Content-Disposition: form-data; name="applyToProfile"
+
+false
+--BoundaryCv4
+Content-Disposition: form-data; name="file"; filename="cv-ats.pdf"
+Content-Type: application/pdf
+
+< ./cv-ats.pdf
+--BoundaryCv4--
+
+### Analyze CV - test file 5 (Scanned/OCR)
+POST {{baseUrl}}/profiles/me/cv/analyze
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=BoundaryCv5
+
+--BoundaryCv5
+Content-Disposition: form-data; name="applyToProfile"
+
+false
+--BoundaryCv5
+Content-Disposition: form-data; name="file"; filename="cv-ocr.pdf"
+Content-Type: application/pdf
+
+< ./cv-ocr.pdf
+--BoundaryCv5--

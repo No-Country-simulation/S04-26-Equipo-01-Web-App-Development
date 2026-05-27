@@ -9,16 +9,16 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from '../application/auth.service';
 import { LoginDto } from '../application/dto/login.dto';
 import { RegisterDto } from '../application/dto/register.dto';
 import { AuthResponse } from '../application/types/auth-response.type';
-import { AuthenticatedUser } from '../domain/authenticated-user.type';
+import type { AuthenticatedUser } from '../domain/authenticated-user.type';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from './types/authenticated-request.type';
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { Request } from 'express';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { ExternalProfileDto } from '../application/dto/external-profile.dto';
 import {
   ApiBearerAuth,
@@ -26,12 +26,12 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
-  ApiUnauthorizedResponse,
-  ApiConflictResponse,
 } from '@nestjs/swagger';
+import { UserRole } from '../../users/domain/user-role.enum';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { LinkedInAuthGuard } from './guards/linkedin-auth.guard';
-import { ConfigService } from '@nestjs/config';
+import passport from 'passport';
+import { AuthConnections } from '../domain/auth-connections.type';
 
 export const GetUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): ExternalProfileDto => {
@@ -47,7 +47,7 @@ export const GetUser = createParamDecorator(
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private configService: ConfigService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Post('register')
@@ -59,10 +59,7 @@ export class AuthController {
   @ApiResponse({
     status: 201,
     description: 'Usuario registrado y autenticado.',
-    type: AuthResponse,
-  })
-  @ApiConflictResponse({
-    description: 'Ya existe un usuario con ese correo.',
+    type: Object,
   })
   register(@Body() registerDto: RegisterDto): Promise<AuthResponse> {
     return this.authService.register(registerDto);
@@ -77,10 +74,7 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Usuario autenticado.',
-    type: AuthResponse,
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Credenciales inválidas.',
+    type: Object,
   })
   @HttpCode(HttpStatus.OK)
   login(@Body() loginDto: LoginDto): Promise<AuthResponse> {
@@ -96,14 +90,30 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Usuario autenticado.',
-    type: AuthenticatedUser,
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Token inválido o ausente.',
+    type: Object,
   })
   @UseGuards(JwtAuthGuard)
   me(@Req() request: AuthenticatedRequest): Promise<AuthenticatedUser> {
     return this.authService.getMe(request.user.userId);
+  }
+
+  @Get('me/connections')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Obtener estado de conexiones OAuth',
+    description:
+      'Devuelve el estado actual de conexiones de proveedores externos para el usuario autenticado.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estado de conexiones OAuth.',
+    type: Object,
+  })
+  @UseGuards(JwtAuthGuard)
+  meConnections(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<AuthConnections> {
+    return this.authService.getMyConnections(request.user.userId);
   }
 
   @Get('linkedin')
@@ -120,16 +130,15 @@ export class AuthController {
     description:
       'Callback para autenticación con LinkedIn. No requiere prueba manual.',
   })
-  @UseGuards(LinkedInAuthGuard)
   async linkedinAuthRedirect(
-    @GetUser() user: ExternalProfileDto,
-    @Res() res: Response,
+    @Req() request: Request,
+    @Res() response: Response,
   ) {
-    const authResponse = await this.authService.loginWithExternalProvider(user);
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-    return res.redirect(
-      `${frontendUrl}/login-success?token=${authResponse.accessToken}`,
+    return this.handleOAuthCallback(
+      request,
+      response,
+      'linkedin',
+      'No se pudo completar el acceso con LinkedIn. Intenta nuevamente.',
     );
   }
 
@@ -147,16 +156,110 @@ export class AuthController {
     description:
       'Callback para autenticación con Google. No requiere prueba manual.',
   })
-  @UseGuards(GoogleAuthGuard)
-  async googleAuthRedirect(
-    @GetUser() user: ExternalProfileDto,
-    @Res() res: Response,
-  ) {
-    const authResponse = await this.authService.loginWithExternalProvider(user);
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-    return res.redirect(
-      `${frontendUrl}/login-success?token=${authResponse.accessToken}`,
+  async googleAuthRedirect(@Req() request: Request, @Res() response: Response) {
+    return this.handleOAuthCallback(
+      request,
+      response,
+      'google',
+      'No se pudo completar el acceso con Google. Intenta nuevamente.',
     );
+  }
+
+  private async handleOAuthCallback(
+    request: Request,
+    response: Response,
+    strategy: 'google' | 'linkedin',
+    genericErrorMessage: string,
+  ): Promise<void> {
+    const authenticate = passport.authenticate.bind(passport) as (
+      strategyName: 'google' | 'linkedin',
+      options: { session: false },
+      callback: (
+        error: unknown,
+        user: ExternalProfileDto | false | null,
+      ) => Promise<void>,
+    ) => (req: Request, res: Response, next: (err?: unknown) => void) => void;
+
+    await new Promise<void>((resolve) => {
+      const middleware = authenticate(
+        strategy,
+        { session: false },
+        async (error: unknown, user: ExternalProfileDto | false | null) => {
+          if (error || !user) {
+            response.redirect(
+              this.buildFrontendLoginErrorUrl(genericErrorMessage),
+            );
+            resolve();
+            return;
+          }
+
+          try {
+            const defaultRole = this.resolveOAuthRole(request.query.state);
+            const authResponse =
+              await this.authService.loginWithExternalProvider(
+                user,
+                defaultRole,
+                strategy,
+              );
+
+            response.redirect(this.buildFrontendOAuthRedirectUrl(authResponse));
+            resolve();
+          } catch {
+            response.redirect(
+              this.buildFrontendLoginErrorUrl(genericErrorMessage),
+            );
+            resolve();
+          }
+        },
+      );
+
+      middleware(request, response, () => undefined);
+    });
+  }
+
+  private resolveOAuthRole(state: unknown): UserRole {
+    if (typeof state !== 'string') {
+      return UserRole.TALENT;
+    }
+
+    const normalizedState = state.toUpperCase();
+    if (normalizedState === UserRole.COMPANY.toString()) {
+      return UserRole.COMPANY;
+    }
+
+    return UserRole.TALENT;
+  }
+
+  private buildFrontendOAuthRedirectUrl(authResponse: AuthResponse): string {
+    const frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
+    const baseUrl = frontendUrl.endsWith('/')
+      ? frontendUrl.slice(0, -1)
+      : frontendUrl;
+    const redirectUrl = new URL('/auth/callback', baseUrl);
+
+    redirectUrl.searchParams.set('token', authResponse.accessToken);
+    redirectUrl.searchParams.set('userId', authResponse.user.id);
+    redirectUrl.searchParams.set('email', authResponse.user.email);
+    redirectUrl.searchParams.set('role', authResponse.user.role);
+
+    return redirectUrl.toString();
+  }
+
+  private buildFrontendLoginErrorUrl(message: string): string {
+    const frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
+    const baseUrl = frontendUrl.endsWith('/')
+      ? frontendUrl.slice(0, -1)
+      : frontendUrl;
+    const redirectUrl = new URL('/login', baseUrl);
+
+    redirectUrl.searchParams.set('oauthError', message);
+
+    return redirectUrl.toString();
   }
 }

@@ -6,6 +6,8 @@ import type {
   CvDiagnostic,
   CreateProfileDto,
   CvAnalysisResponse,
+  ImportLinkedInCvDto,
+  LinkedInCvImportResponse,
   Profile,
   SaveCvDiagnosticDto,
   UpdateInterestedRolesDto,
@@ -150,6 +152,20 @@ export const getMyCvDiagnostics = async (): Promise<CvDiagnostic[]> => {
 export const getMyLatestCvDiagnostic = async (): Promise<CvDiagnostic> => {
   try {
     const response = await api.get<CvDiagnostic>('/profiles/me/cv/diagnostics/latest');
+    return response.data;
+  } catch (error: unknown) {
+    return throwBackendError(error);
+  }
+};
+
+export const importMyCvFromLinkedIn = async (
+  data: ImportLinkedInCvDto,
+): Promise<LinkedInCvImportResponse> => {
+  try {
+    const response = await api.post<LinkedInCvImportResponse>(
+      '/profiles/me/cv/import-linkedin',
+      data,
+    );
     return response.data;
   } catch (error: unknown) {
     return throwBackendError(error);

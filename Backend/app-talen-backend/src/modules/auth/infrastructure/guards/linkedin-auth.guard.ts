@@ -1,17 +1,41 @@
-import { Injectable, ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Request } from 'express';
+import type { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { UserRole } from '../../../users/domain/user-role.enum';
 
 @Injectable()
 export class LinkedInAuthGuard extends AuthGuard('linkedin') {
-  getAuthenticateOptions(context: ExecutionContext) {
-    const req = context.switchToHttp().getRequest<Request>();
-    const role = req.query.role as string | undefined;
+  constructor(private readonly configService: ConfigService) {
+    super();
+  }
 
-    if (role) {
-      return { state: role };
-    }
+  override getAuthenticateOptions(context: ExecutionContext) {
+    const request = context.switchToHttp().getRequest<Request>();
+    const roleParam =
+      typeof request.query.role === 'string'
+        ? request.query.role.toUpperCase()
+        : undefined;
 
-    return {};
+    const selectedRole =
+      roleParam === UserRole.COMPANY ? UserRole.COMPANY : UserRole.TALENT;
+
+    const frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
+    const baseUrl = frontendUrl.endsWith('/')
+      ? frontendUrl.slice(0, -1)
+      : frontendUrl;
+    const failureRedirect = new URL('/login', baseUrl);
+    failureRedirect.searchParams.set(
+      'oauthError',
+      'No se pudo autenticar con LinkedIn. Verifica redirect_uri y reintenta.',
+    );
+
+    return {
+      state: selectedRole,
+      failureRedirect: failureRedirect.toString(),
+    };
   }
 }

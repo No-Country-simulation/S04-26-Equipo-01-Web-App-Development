@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { AuthenticatedUser } from '../../domain/authenticated-user.type';
+import type { AuthenticatedUser } from '../../domain/authenticated-user.type';
 
 export class AuthResponse {
   @ApiProperty({
@@ -23,7 +23,12 @@ export class AuthResponse {
 
   @ApiProperty({
     description: 'Usuario autenticado asociado al token.',
-    type: () => AuthenticatedUser,
+    example: {
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      email: 'usuario@correo.com',
+      name: 'Nombre Usuario',
+      role: 'TALENT',
+    },
   })
   user!: AuthenticatedUser;
 }

@@ -15,14 +15,19 @@ import { UserModuleProgress } from '../../learning/infrastructure/entities/user-
 import { SkillLevel } from '../../skills/domain/skill-level.enum';
 import { UserSkill } from '../../skills/infrastructure/entities/user-skill.entity';
 import { UserRole } from '../../users/domain/user-role.enum';
+import { AssessmentLevel } from '../../assessment/domain/assessment-level.enum';
 import { AnalyzeCvDto } from './dto/analyze-cv.dto';
 import { CreateProfileDto } from './dto/create-profile.dto';
+import { ImportLinkedInCvDto } from './dto/import-linkedin-cv.dto';
 import { UpdateInterestedRolesDto } from './dto/update-interested-roles.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateWorkPreferencesDto } from './dto/update-work-preferences.dto';
 import { SaveCvDiagnosticDto } from './dto/save-cv-diagnostic.dto';
 import { CvAnalysisResponse } from '../domain/cv-analysis-response.type';
+import { LinkedInCvImportResponse } from '../domain/linkedin-cv-import-response.type';
 import { UploadedCvFile } from '../domain/uploaded-cv-file.type';
+import { InterestedRole } from '../domain/interested-role.enum';
+import { WorkModality } from '../domain/work-modality.enum';
 import { CvDiagnostic } from '../infrastructure/entities/cv-diagnostic.entity';
 import { ProfileEducation } from '../infrastructure/entities/profile-education.entity';
 import { ProfileExperience } from '../infrastructure/entities/profile-experience.entity';
@@ -150,11 +155,8 @@ export class ProfilesService {
     this.ensureTalent(authUser);
 
     const cvText = await this.extractCvText(file, analyzeCvDto.extractedText);
-    const analysis = await this.aiCvService.analyzeCv(cvText);
-
-    if (!analysis) {
-      throw new BadRequestException('CV analysis could not be generated');
-    }
+    const aiAnalysis = await this.aiCvService.analyzeCv(cvText);
+    const analysis = aiAnalysis ?? this.buildFallbackCvAnalysis(cvText);
 
     const appliedFields: string[] = [];
     let updatedProfile: Profile | undefined;
@@ -167,6 +169,17 @@ export class ProfilesService {
     }
 
     const profile = await this.findMyProfile(authUser.userId);
+    const normalizedTechnicalSkills = analysis.suggestedSkills
+      .filter(
+        (skill) => this.normalizeSkillCategory(skill.category) === 'technical',
+      )
+      .map((skill) => skill.name);
+    const normalizedPersonalSkills = analysis.suggestedSkills
+      .filter(
+        (skill) => this.normalizeSkillCategory(skill.category) === 'personal',
+      )
+      .map((skill) => skill.name);
+
     const savedDiagnostic = await this.cvDiagnosticsRepository.save(
       this.cvDiagnosticsRepository.create({
         profileId: profile.id,
@@ -174,12 +187,8 @@ export class ProfilesService {
         extractedTextLength: cvText.length,
         rawText: cvText,
         summary: analysis.summary,
-        technicalSkills: analysis.suggestedSkills
-          .filter((skill) => skill.category.toLowerCase() === 'technical')
-          .map((skill) => skill.name),
-        personalSkills: analysis.suggestedSkills
-          .filter((skill) => skill.category.toLowerCase() === 'personal')
-          .map((skill) => skill.name),
+        technicalSkills: normalizedTechnicalSkills,
+        personalSkills: normalizedPersonalSkills,
         aiAnalysis: analysis as unknown as Record<string, unknown>,
       }),
     );
@@ -253,6 +262,23 @@ export class ProfilesService {
     }
 
     return diagnostic;
+  }
+
+  async importMyCvFromLinkedIn(
+    authUser: AuthTokenPayload,
+    payload: ImportLinkedInCvDto,
+  ): Promise<LinkedInCvImportResponse> {
+    this.ensureTalent(authUser);
+
+    const manualExtractedText = payload.extractedText?.trim() ?? '';
+
+    return await Promise.resolve({
+      sourceUrl: payload.linkedinUrl?.trim() || 'linkedin_disabled',
+      extractedText: manualExtractedText,
+      extractedTextLength: manualExtractedText.length,
+      summary:
+        'La importacion de CV desde LinkedIn esta deshabilitada temporalmente. Usa la carga de CV por PDF o texto.',
+    });
   }
 
   private async findMyProfile(userId: string): Promise<Profile> {
@@ -494,6 +520,596 @@ export class ProfilesService {
     }
 
     return appliedFields;
+  }
+
+  private normalizeSkillCategory(category: string): 'technical' | 'personal' {
+    const normalized = (category || '').trim().toLowerCase();
+
+    if (
+      normalized.includes('personal') ||
+      normalized.includes('soft') ||
+      normalized.includes('blanda') ||
+      normalized.includes('behavior') ||
+      normalized.includes('socio')
+    ) {
+      return 'personal';
+    }
+
+    return 'technical';
+  }
+
+  private buildFallbackCvAnalysis(cvText: string): AiCvAnalysis {
+    const compactText = cvText.replace(/\s+/g, ' ').trim();
+    const firstLine = cvText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line.length > 0);
+
+    const modality = this.inferWorkModality(compactText);
+    const yearsExperience = this.inferYearsExperience(compactText);
+    const interestedRoles = this.inferInterestedRoles(compactText);
+    const suggestedSkills = this.extractSkillsFromText(compactText);
+
+    return {
+      summary:
+        'Analisis generado en modo compatible para soportar diferentes formatos de CV. Revisa y ajusta los datos sugeridos.',
+      profileSuggestions: {
+        fullName: undefined,
+        location: undefined,
+        country: undefined,
+        preferredModality: modality,
+        headline: firstLine && firstLine.length <= 120 ? firstLine : undefined,
+        professionalBio: compactText.slice(0, 500) || undefined,
+        yearsExperience,
+        interestedRoles,
+      },
+      assessmentSuggestions: {
+        digitalLevel: AssessmentLevel.INTERMEDIATE,
+        cognitiveLevel: AssessmentLevel.INTERMEDIATE,
+        socioEmotionalLevel: AssessmentLevel.INTERMEDIATE,
+        careerGoal: undefined,
+        answers: {
+          source: 'fallback',
+          note: 'AI CV analysis unavailable; generated from text heuristics.',
+        },
+      },
+      suggestedSkills,
+    };
+  }
+
+  private inferWorkModality(text: string): WorkModality | undefined {
+    const lower = text.toLowerCase();
+
+    if (
+      lower.includes('remoto') ||
+      lower.includes('remote') ||
+      lower.includes('virtual')
+    ) {
+      return WorkModality.VIRTUAL;
+    }
+
+    if (
+      lower.includes('hibrido') ||
+      lower.includes('híbrido') ||
+      lower.includes('hybrid')
+    ) {
+      return WorkModality.HIBRIDO;
+    }
+
+    if (
+      lower.includes('presencial') ||
+      lower.includes('onsite') ||
+      lower.includes('on-site')
+    ) {
+      return WorkModality.PRESENCIAL;
+    }
+
+    return undefined;
+  }
+
+  private inferYearsExperience(text: string): number | undefined {
+    const yearsMatch = text.match(/(\d{1,2})\s*\+?\s*(anios|años|years)/i);
+    if (!yearsMatch) {
+      return undefined;
+    }
+
+    const years = Number(yearsMatch[1]);
+    if (!Number.isFinite(years)) {
+      return undefined;
+    }
+
+    return Math.max(0, Math.min(years, 80));
+  }
+
+  private inferInterestedRoles(text: string): InterestedRole[] {
+    const lower = text.toLowerCase();
+    const roles: InterestedRole[] = [];
+
+    if (/(backend|node|java|\.net|spring|api)/i.test(lower)) {
+      roles.push(InterestedRole.BACKEND_DEVELOPER);
+    }
+
+    if (
+      /(frontend|react|angular|vue|javascript|typescript|css|html)/i.test(lower)
+    ) {
+      roles.push(InterestedRole.FRONTEND_DEVELOPER);
+    }
+
+    if (/(fullstack|full stack)/i.test(lower)) {
+      roles.push(InterestedRole.FULLSTACK_DEVELOPER);
+    }
+
+    if (/(qa|tester|testing|pruebas)/i.test(lower)) {
+      roles.push(InterestedRole.QA_TESTER);
+    }
+
+    if (/(data|analyst|analista|sql|bi|power bi|tableau)/i.test(lower)) {
+      roles.push(InterestedRole.DATA_ANALYST);
+    }
+
+    if (/(ux|ui|figma|disenador|diseñador)/i.test(lower)) {
+      roles.push(InterestedRole.UX_UI_DESIGNER);
+    }
+
+    if (/(soporte|support|help desk|mesa de ayuda)/i.test(lower)) {
+      roles.push(InterestedRole.SUPPORT_IT);
+    }
+
+    if (/(ciberseguridad|cybersecurity|pentest|soc)/i.test(lower)) {
+      roles.push(InterestedRole.CYBERSECURITY_TRAINEE);
+    }
+
+    return Array.from(new Set(roles));
+  }
+
+  private extractSkillsFromText(text: string): AiCvAnalysis['suggestedSkills'] {
+    const catalog: Array<{
+      term: string;
+      category: 'technical' | 'personal';
+      normalizedName: string;
+    }> = [
+      { term: 'react', category: 'technical', normalizedName: 'react' },
+      { term: 'angular', category: 'technical', normalizedName: 'angular' },
+      { term: 'vue', category: 'technical', normalizedName: 'vue' },
+      {
+        term: 'javascript',
+        category: 'technical',
+        normalizedName: 'javascript',
+      },
+      {
+        term: 'typescript',
+        category: 'technical',
+        normalizedName: 'typescript',
+      },
+      { term: 'node', category: 'technical', normalizedName: 'node.js' },
+      { term: 'python', category: 'technical', normalizedName: 'python' },
+      { term: 'java', category: 'technical', normalizedName: 'java' },
+      { term: 'sql', category: 'technical', normalizedName: 'sql' },
+      { term: 'excel', category: 'technical', normalizedName: 'excel' },
+      { term: 'power bi', category: 'technical', normalizedName: 'power bi' },
+      { term: 'tableau', category: 'technical', normalizedName: 'tableau' },
+      {
+        term: 'contabilidad',
+        category: 'technical',
+        normalizedName: 'contabilidad',
+      },
+      {
+        term: 'contabilidad general',
+        category: 'technical',
+        normalizedName: 'contabilidad general',
+      },
+      {
+        term: 'contabilidad financiera',
+        category: 'technical',
+        normalizedName: 'contabilidad financiera',
+      },
+      { term: 'nomina', category: 'technical', normalizedName: 'nomina' },
+      { term: 'nómina', category: 'technical', normalizedName: 'nomina' },
+      {
+        term: 'gestion de nomina',
+        category: 'technical',
+        normalizedName: 'gestion de nomina',
+      },
+      {
+        term: 'gestión de nómina',
+        category: 'technical',
+        normalizedName: 'gestion de nomina',
+      },
+      { term: 'finanzas', category: 'technical', normalizedName: 'finanzas' },
+      { term: 'sap', category: 'technical', normalizedName: 'sap' },
+      {
+        term: 'facturacion',
+        category: 'technical',
+        normalizedName: 'facturacion',
+      },
+      {
+        term: 'facturación',
+        category: 'technical',
+        normalizedName: 'facturacion',
+      },
+      { term: 'tesoreria', category: 'technical', normalizedName: 'tesoreria' },
+      { term: 'tesorería', category: 'technical', normalizedName: 'tesoreria' },
+      {
+        term: 'conciliacion bancaria',
+        category: 'technical',
+        normalizedName: 'conciliacion bancaria',
+      },
+      {
+        term: 'conciliación bancaria',
+        category: 'technical',
+        normalizedName: 'conciliacion bancaria',
+      },
+      {
+        term: 'retenciones',
+        category: 'technical',
+        normalizedName: 'retenciones',
+      },
+      { term: 'niif', category: 'technical', normalizedName: 'niif' },
+      {
+        term: 'profit plus',
+        category: 'technical',
+        normalizedName: 'profit plus',
+      },
+      {
+        term: 'erp profit plus',
+        category: 'technical',
+        normalizedName: 'erp profit plus',
+      },
+      {
+        term: 'quickbooks',
+        category: 'technical',
+        normalizedName: 'quickbooks',
+      },
+      {
+        term: 'auxiliar administrativo',
+        category: 'technical',
+        normalizedName: 'auxiliar administrativo',
+      },
+      {
+        term: 'administracion',
+        category: 'technical',
+        normalizedName: 'administracion',
+      },
+      {
+        term: 'administración',
+        category: 'technical',
+        normalizedName: 'administracion',
+      },
+      {
+        term: 'gestion administrativa',
+        category: 'technical',
+        normalizedName: 'gestion administrativa',
+      },
+      {
+        term: 'gestión administrativa',
+        category: 'technical',
+        normalizedName: 'gestion administrativa',
+      },
+      {
+        term: 'gestion documental',
+        category: 'technical',
+        normalizedName: 'gestion documental',
+      },
+      {
+        term: 'gestión documental',
+        category: 'technical',
+        normalizedName: 'gestion documental',
+      },
+      { term: 'archivo', category: 'technical', normalizedName: 'archivo' },
+      {
+        term: 'atencion al cliente',
+        category: 'technical',
+        normalizedName: 'atencion al cliente',
+      },
+      {
+        term: 'atención al cliente',
+        category: 'technical',
+        normalizedName: 'atencion al cliente',
+      },
+      {
+        term: 'paquete office',
+        category: 'technical',
+        normalizedName: 'paquete office',
+      },
+      { term: 'word', category: 'technical', normalizedName: 'word' },
+      { term: 'excel', category: 'technical', normalizedName: 'excel' },
+      {
+        term: 'powerpoint',
+        category: 'technical',
+        normalizedName: 'powerpoint',
+      },
+      {
+        term: 'historia clinica',
+        category: 'technical',
+        normalizedName: 'historia clinica',
+      },
+      {
+        term: 'historia clínica',
+        category: 'technical',
+        normalizedName: 'historia clinica',
+      },
+      { term: 'medico', category: 'technical', normalizedName: 'medicina' },
+      { term: 'médico', category: 'technical', normalizedName: 'medicina' },
+      {
+        term: 'medicina general',
+        category: 'technical',
+        normalizedName: 'medicina general',
+      },
+      { term: 'triaje', category: 'technical', normalizedName: 'triaje' },
+      { term: 'triage', category: 'technical', normalizedName: 'triaje' },
+      {
+        term: 'consulta externa',
+        category: 'technical',
+        normalizedName: 'consulta externa',
+      },
+      {
+        term: 'diagnostico medico',
+        category: 'technical',
+        normalizedName: 'diagnostico medico',
+      },
+      {
+        term: 'diagnóstico médico',
+        category: 'technical',
+        normalizedName: 'diagnostico medico',
+      },
+      {
+        term: 'signos vitales',
+        category: 'technical',
+        normalizedName: 'signos vitales',
+      },
+      {
+        term: 'farmacologia',
+        category: 'technical',
+        normalizedName: 'farmacologia',
+      },
+      {
+        term: 'farmacología',
+        category: 'technical',
+        normalizedName: 'farmacologia',
+      },
+      {
+        term: 'primeros auxilios',
+        category: 'technical',
+        normalizedName: 'primeros auxilios',
+      },
+      {
+        term: 'enfermeria',
+        category: 'technical',
+        normalizedName: 'enfermeria',
+      },
+      {
+        term: 'enfermería',
+        category: 'technical',
+        normalizedName: 'enfermeria',
+      },
+      {
+        term: 'diagnostico clinico',
+        category: 'technical',
+        normalizedName: 'diagnostico clinico',
+      },
+      {
+        term: 'diagnóstico clínico',
+        category: 'technical',
+        normalizedName: 'diagnostico clinico',
+      },
+      {
+        term: 'mantenimiento preventivo',
+        category: 'technical',
+        normalizedName: 'mantenimiento preventivo',
+      },
+      {
+        term: 'mantenimiento correctivo',
+        category: 'technical',
+        normalizedName: 'mantenimiento correctivo',
+      },
+      {
+        term: 'electromecanica',
+        category: 'technical',
+        normalizedName: 'electromecanica',
+      },
+      {
+        term: 'electromecánica',
+        category: 'technical',
+        normalizedName: 'electromecanica',
+      },
+      {
+        term: 'electricidad',
+        category: 'technical',
+        normalizedName: 'electricidad',
+      },
+      {
+        term: 'instrumentacion',
+        category: 'technical',
+        normalizedName: 'instrumentacion',
+      },
+      {
+        term: 'instrumentación',
+        category: 'technical',
+        normalizedName: 'instrumentacion',
+      },
+      { term: 'autocad', category: 'technical', normalizedName: 'autocad' },
+      { term: 'mecanica', category: 'technical', normalizedName: 'mecanica' },
+      { term: 'mecánica', category: 'technical', normalizedName: 'mecanica' },
+      {
+        term: 'mecanica automotriz',
+        category: 'technical',
+        normalizedName: 'mecanica automotriz',
+      },
+      {
+        term: 'mecánica automotriz',
+        category: 'technical',
+        normalizedName: 'mecanica automotriz',
+      },
+      {
+        term: 'mantenimiento mecanico',
+        category: 'technical',
+        normalizedName: 'mantenimiento mecanico',
+      },
+      {
+        term: 'mantenimiento mecánico',
+        category: 'technical',
+        normalizedName: 'mantenimiento mecanico',
+      },
+      { term: 'soldadura', category: 'technical', normalizedName: 'soldadura' },
+      {
+        term: 'metrologia',
+        category: 'technical',
+        normalizedName: 'metrologia',
+      },
+      {
+        term: 'metrología',
+        category: 'technical',
+        normalizedName: 'metrologia',
+      },
+      {
+        term: 'logistica militar',
+        category: 'technical',
+        normalizedName: 'logistica militar',
+      },
+      {
+        term: 'logística militar',
+        category: 'technical',
+        normalizedName: 'logistica militar',
+      },
+      {
+        term: 'operaciones militares',
+        category: 'technical',
+        normalizedName: 'operaciones militares',
+      },
+      {
+        term: 'seguridad y defensa',
+        category: 'technical',
+        normalizedName: 'seguridad y defensa',
+      },
+      {
+        term: 'cadena de mando',
+        category: 'technical',
+        normalizedName: 'cadena de mando',
+      },
+      {
+        term: 'tacticas de patrullaje',
+        category: 'technical',
+        normalizedName: 'tacticas de patrullaje',
+      },
+      {
+        term: 'tácticas de patrullaje',
+        category: 'technical',
+        normalizedName: 'tacticas de patrullaje',
+      },
+      {
+        term: 'normativa castrense',
+        category: 'technical',
+        normalizedName: 'normativa castrense',
+      },
+      {
+        term: 'comunicacion',
+        category: 'personal',
+        normalizedName: 'comunicacion',
+      },
+      {
+        term: 'comunicación',
+        category: 'personal',
+        normalizedName: 'comunicacion',
+      },
+      { term: 'liderazgo', category: 'personal', normalizedName: 'liderazgo' },
+      {
+        term: 'trabajo en equipo',
+        category: 'personal',
+        normalizedName: 'trabajo en equipo',
+      },
+      {
+        term: 'proactivo',
+        category: 'personal',
+        normalizedName: 'proactividad',
+      },
+      {
+        term: 'proactiva',
+        category: 'personal',
+        normalizedName: 'proactividad',
+      },
+      {
+        term: 'orientacion al detalle',
+        category: 'personal',
+        normalizedName: 'orientacion al detalle',
+      },
+      {
+        term: 'orientación al detalle',
+        category: 'personal',
+        normalizedName: 'orientacion al detalle',
+      },
+      {
+        term: 'responsabilidad',
+        category: 'personal',
+        normalizedName: 'responsabilidad',
+      },
+      {
+        term: 'organizacion',
+        category: 'personal',
+        normalizedName: 'organizacion',
+      },
+      {
+        term: 'organización',
+        category: 'personal',
+        normalizedName: 'organizacion',
+      },
+      { term: 'empatia', category: 'personal', normalizedName: 'empatia' },
+      { term: 'empatía', category: 'personal', normalizedName: 'empatia' },
+      {
+        term: 'trabajo bajo presion',
+        category: 'personal',
+        normalizedName: 'trabajo bajo presion',
+      },
+      {
+        term: 'trabajo bajo presión',
+        category: 'personal',
+        normalizedName: 'trabajo bajo presion',
+      },
+      {
+        term: 'servicio al cliente',
+        category: 'personal',
+        normalizedName: 'servicio al cliente',
+      },
+    ];
+
+    const found = catalog
+      .filter((item) => this.containsTermWithBoundaries(text, item.term))
+      .map((item) => ({
+        name: item.normalizedName,
+        category: item.category,
+        level: SkillLevel.INITIAL,
+      }));
+
+    return Array.from(
+      new Map(found.map((item) => [item.name.toLowerCase(), item])).values(),
+    );
+  }
+
+  private normalizeForMatch(value: string): string {
+    return value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  }
+
+  private containsTermWithBoundaries(source: string, term: string): boolean {
+    const normalizedSource = this.normalizeForMatch(source);
+    const normalizedTerm = this.normalizeForMatch(term);
+
+    if (!normalizedSource || !normalizedTerm) {
+      return false;
+    }
+
+    const escapedTerm = normalizedTerm
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s+');
+
+    const regex = new RegExp(
+      `(?:^|[^\\p{L}\\p{N}])${escapedTerm}(?:$|[^\\p{L}\\p{N}])`,
+      'iu',
+    );
+
+    return regex.test(normalizedSource);
   }
 
   private async replaceProfileCvSections(

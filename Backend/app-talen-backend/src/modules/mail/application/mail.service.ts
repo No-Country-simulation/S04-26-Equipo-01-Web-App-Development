@@ -11,6 +11,33 @@ type SendRegistrationConfirmationParams = {
   recipientName?: string;
 };
 
+type VacancyNotificationParams = {
+  to: string;
+  vacancyTitle: string;
+  companyName?: string;
+};
+
+type TalentPipelineStage = 'PREAPROBADO' | 'APROBADO' | 'SELECCIONADO';
+
+type TalentPipelineNotificationParams = {
+  to: string;
+  vacancyTitle: string;
+  stage: TalentPipelineStage;
+};
+
+type CourseNotificationParams = {
+  to: string;
+  courseTitle: string;
+};
+
+type MeetingNotificationParams = {
+  to: string;
+  courseTitle: string;
+  platform?: string;
+  scheduledAt?: Date;
+  url: string;
+};
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -33,6 +60,162 @@ export class MailService {
   async sendRegistrationConfirmation(
     params: SendRegistrationConfirmationParams,
   ): Promise<void> {
+    const subject = 'Bienvenido a Red de Bienestar Laboral';
+    const recipientName = params.recipientName?.trim() || params.to;
+    const safeRecipientName = this.escapeHtml(recipientName);
+    const text = this.buildPlainTextMessage(recipientName, this.frontendUrl);
+    const html = this.buildHtmlMessage(safeRecipientName, this.frontendUrl);
+
+    await this.sendEmail({
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  async sendVacancyCreatedNotification(
+    params: VacancyNotificationParams,
+  ): Promise<void> {
+    const companyName = params.companyName?.trim() || 'tu empresa';
+    const subject = 'Vacante creada correctamente';
+    const text = [
+      'Tu vacante fue registrada con exito.',
+      `Vacante: ${params.vacancyTitle}`,
+      `Empresa: ${companyName}`,
+      '',
+      'Puedes gestionarla desde tu dashboard de empresa.',
+    ].join('\n');
+    const html = [
+      '<p>Tu vacante fue registrada con exito.</p>',
+      `<p><strong>Vacante:</strong> ${this.escapeHtml(params.vacancyTitle)}</p>`,
+      `<p><strong>Empresa:</strong> ${this.escapeHtml(companyName)}</p>`,
+      '<p>Puedes gestionarla desde tu dashboard de empresa.</p>',
+    ].join('');
+
+    await this.sendEmail({
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  async sendTalentVacancyAvailableNotification(
+    params: VacancyNotificationParams,
+  ): Promise<void> {
+    const companyName = params.companyName?.trim() || 'una empresa';
+    const subject = 'Nueva vacante disponible para ti';
+    const text = [
+      'Se publico una nueva vacante que puede interesarte.',
+      `Vacante: ${params.vacancyTitle}`,
+      `Empresa: ${companyName}`,
+      '',
+      'Ingresa a la plataforma para revisar los detalles.',
+    ].join('\n');
+    const html = [
+      '<p>Se publico una nueva vacante que puede interesarte.</p>',
+      `<p><strong>Vacante:</strong> ${this.escapeHtml(params.vacancyTitle)}</p>`,
+      `<p><strong>Empresa:</strong> ${this.escapeHtml(companyName)}</p>`,
+      '<p>Ingresa a la plataforma para revisar los detalles.</p>',
+    ].join('');
+
+    await this.sendEmail({
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  async sendTalentPipelineUpdateNotification(
+    params: TalentPipelineNotificationParams,
+  ): Promise<void> {
+    const stageLabel = params.stage;
+    const subject = `Actualizacion de tu proceso: ${stageLabel}`;
+    const text = [
+      'Tu proceso en una vacante tuvo una actualizacion.',
+      `Vacante: ${params.vacancyTitle}`,
+      `Estado actual: ${stageLabel}`,
+      '',
+      'Revisa tu panel de talento para mas informacion.',
+    ].join('\n');
+    const html = [
+      '<p>Tu proceso en una vacante tuvo una actualizacion.</p>',
+      `<p><strong>Vacante:</strong> ${this.escapeHtml(params.vacancyTitle)}</p>`,
+      `<p><strong>Estado actual:</strong> ${this.escapeHtml(stageLabel)}</p>`,
+      '<p>Revisa tu panel de talento para mas informacion.</p>',
+    ].join('');
+
+    await this.sendEmail({
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  async sendCourseCreatedNotification(
+    params: CourseNotificationParams,
+  ): Promise<void> {
+    const subject = 'Nuevo curso creado';
+    const text = [
+      'Se creo un nuevo curso en la academia.',
+      `Curso: ${params.courseTitle}`,
+      '',
+      'Ya puedes administrarlo desde el panel correspondiente.',
+    ].join('\n');
+    const html = [
+      '<p>Se creo un nuevo curso en la academia.</p>',
+      `<p><strong>Curso:</strong> ${this.escapeHtml(params.courseTitle)}</p>`,
+      '<p>Ya puedes administrarlo desde el panel correspondiente.</p>',
+    ].join('');
+
+    await this.sendEmail({
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  async sendWorkshopMeetingCreatedNotification(
+    params: MeetingNotificationParams,
+  ): Promise<void> {
+    const scheduled = params.scheduledAt
+      ? params.scheduledAt.toISOString()
+      : 'Pendiente de confirmacion';
+    const platform = params.platform || 'Meet';
+    const subject = 'Nueva sesion de taller programada';
+    const text = [
+      'Se programo una nueva sesion de taller.',
+      `Curso: ${params.courseTitle}`,
+      `Plataforma: ${platform}`,
+      `Fecha: ${scheduled}`,
+      `Enlace: ${params.url}`,
+    ].join('\n');
+    const html = [
+      '<p>Se programo una nueva sesion de taller.</p>',
+      `<p><strong>Curso:</strong> ${this.escapeHtml(params.courseTitle)}</p>`,
+      `<p><strong>Plataforma:</strong> ${this.escapeHtml(platform)}</p>`,
+      `<p><strong>Fecha:</strong> ${this.escapeHtml(scheduled)}</p>`,
+      `<p><strong>Enlace:</strong> <a href="${this.escapeHtml(params.url)}">${this.escapeHtml(params.url)}</a></p>`,
+    ].join('');
+
+    await this.sendEmail({
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  private async sendEmail(params: {
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+  }): Promise<void> {
     if (!this.resendApiKey) {
       this.logger.warn(
         `RESEND_API_KEY is not configured. Skipping email for ${params.to}.`,
@@ -47,12 +230,6 @@ export class MailService {
       return;
     }
 
-    const subject = 'Bienvenido a Red de Bienestar Laboral';
-    const recipientName = params.recipientName?.trim() || params.to;
-    const safeRecipientName = this.escapeHtml(recipientName);
-    const text = this.buildPlainTextMessage(recipientName, this.frontendUrl);
-    const html = this.buildHtmlMessage(safeRecipientName, this.frontendUrl);
-
     const controller = new AbortController();
     const timeoutMs = 10000; // 10s timeout
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -66,9 +243,9 @@ export class MailService {
       body: JSON.stringify({
         from: this.sanitizeFrom(this.fromEmail),
         to: [params.to],
-        subject,
-        text,
-        html,
+        subject: params.subject,
+        text: params.text,
+        html: params.html,
       }),
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout));
@@ -86,7 +263,7 @@ export class MailService {
       );
     }
 
-    this.logger.log(`Confirmation email queued for ${params.to}.`);
+    this.logger.log(`Email queued for ${params.to}: ${params.subject}`);
   }
 
   private isValidEmail(email: string): boolean {

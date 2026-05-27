@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { UserRole, type AuthUser } from '../../types/auth.types'; 
 
@@ -18,6 +17,18 @@ interface CustomJwtPayload {
   role: string;
 }
 
+function decodeJwtPayload(token: string): CustomJwtPayload {
+  const parts = token.split('.');
+  if (parts.length < 2) {
+    throw new Error('Invalid JWT token');
+  }
+
+  const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4 || 4)) % 4);
+  const decoded = atob(padded);
+  return JSON.parse(decoded) as CustomJwtPayload;
+}
+
 export const LoginSuccess: FC<LoginSuccessProps> = ({ onLoginSuccess }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -29,7 +40,7 @@ export const LoginSuccess: FC<LoginSuccessProps> = ({ onLoginSuccess }) => {
       try {
         localStorage.setItem('token', token);
         
-        const decodedToken = jwtDecode<CustomJwtPayload>(token);
+        const decodedToken = decodeJwtPayload(token);
 
         const authUser: AuthUser = {
           id: decodedToken.id || decodedToken.sub || '',

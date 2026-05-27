@@ -19,6 +19,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { AuthUser } from '../../types/auth.types';
+import { AdminAcademyPanel } from './AdminAcademyPanel';
 
 interface AdminDashboardProps {
   user: AuthUser;
@@ -43,12 +44,17 @@ export const AdminDashboard = ({ user }: AdminDashboardProps) => {
       title: 'CURATORIA ACADEMIA',
       items: ['Aprobar Cursos Empresa', 'Gestion de Badges/Insignias', 'Moderacion de Foros'],
     },
+    {
+      title: 'ACADEMIA PRO',
+      items: ['Cursos', 'Talleres'],
+    },
   ];
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     'GESTION USUARIOS': true,
     'PROCESOS & MATCH': true,
     'CURATORIA ACADEMIA': true,
+    'ACADEMIA PRO': true,
   });
 
   const handleToggleSection = (title: string) => {
@@ -64,6 +70,10 @@ export const AdminDashboard = ({ user }: AdminDashboardProps) => {
   };
 
   const renderHomeContent = () => {
+    if (selectedMenuItem === 'Cursos' || selectedMenuItem === 'Talleres') {
+      return <AdminAcademyPanel tab={selectedMenuItem} />;
+    }
+
     if (selectedMenuItem) {
       return (
         <Paper sx={{ p: { xs: 3, md: 5 }, borderRadius: 3, minHeight: 420, boxShadow: '0px 3px 10px rgba(11,38,69,0.08)' }}>
@@ -389,18 +399,24 @@ export const AdminDashboard = ({ user }: AdminDashboardProps) => {
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Box
           sx={{
-            height: 74,
+            minHeight: 74,
             bgcolor: '#F8FBFF',
             borderBottom: '1px solid #D7E1EC',
             px: { xs: 2, md: 4 },
+            py: { xs: 1.2, md: 0 },
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: 2,
+            flexWrap: { xs: 'wrap', md: 'nowrap' },
           }}
         >
-          <TextField size="small" placeholder="Buscar talento, empresa o curso..." sx={{ width: { xs: '100%', md: 420 }, bgcolor: '#fff' }} />
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <TextField
+            size="small"
+            placeholder="Buscar talento, empresa o curso..."
+            sx={{ width: { xs: '100%', md: 420 }, bgcolor: '#fff' }}
+          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'flex-end', md: 'flex-start' } }}>
             <Typography sx={{ color: '#E5741F', fontWeight: 800 }}>!</Typography>
             <Typography sx={{ fontWeight: 700, color: '#111C33' }}>Admin: {user?.name || 'Admin01'}</Typography>
             <Avatar sx={{ width: 34, height: 34, bgcolor: '#081B43', color: '#fff', fontWeight: 700 }}>
@@ -410,6 +426,31 @@ export const AdminDashboard = ({ user }: AdminDashboardProps) => {
         </Box>
 
         <Box sx={{ p: { xs: 2, md: 4 } }}>
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, gap: 1, overflowX: 'auto', pb: 1.2, mb: 1.2 }}>
+            {sidebarSections.flatMap((section) =>
+              section.items.map((item) => (
+                <Button
+                  key={`mobile-admin-${item}`}
+                  size="small"
+                  variant={selectedMenuItem === item ? 'contained' : 'outlined'}
+                  onClick={() => openHomePlaceholder(item)}
+                  sx={{
+                    whiteSpace: 'nowrap',
+                    textTransform: 'none',
+                    borderColor: '#173A68',
+                    color: selectedMenuItem === item ? '#fff' : '#173A68',
+                    bgcolor: selectedMenuItem === item ? '#173A68' : 'transparent',
+                    '&:hover': {
+                      bgcolor: selectedMenuItem === item ? '#112D51' : 'rgba(23,58,104,0.08)',
+                    },
+                  }}
+                >
+                  {item}
+                </Button>
+              )),
+            )}
+          </Box>
+
           {currentView === 'home' ? renderHomeContent() : renderConfigContent()}
         </Box>
       </Box>

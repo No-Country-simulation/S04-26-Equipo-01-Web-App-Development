@@ -3,14 +3,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MailModule } from '../mail/mail.module';
 import { UsersModule } from '../users/users.module';
 import { User } from '../users/infrastructure/entities/user.entity';
 import { AuthService } from './application/auth.service';
 import { JwtAuthGuard } from './infrastructure/guards/jwt-auth.guard';
+import { GoogleAuthGuard } from './infrastructure/guards/google-auth.guard';
+import { LinkedInAuthGuard } from './infrastructure/guards/linkedin-auth.guard';
 import { AuthController } from './infrastructure/auth.controller';
 import { LinkedInStrategy } from './infrastructure/strategies/linkedin.strategy';
 import { GoogleStrategy } from './infrastructure/strategies/google.strategy';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -41,7 +43,14 @@ import { GoogleStrategy } from './infrastructure/strategies/google.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, LinkedInStrategy, GoogleStrategy],
+  providers: [
+    AuthService,
+    JwtAuthGuard,
+    GoogleAuthGuard,
+    LinkedInAuthGuard,
+    LinkedInStrategy,
+    GoogleStrategy,
+  ],
   exports: [JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}
