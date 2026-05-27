@@ -137,7 +137,13 @@ export const AdminAcademyPanel = ({ tab }: AdminAcademyPanelProps) => {
   };
 
   useEffect(() => {
-    void loadAcademyCourses();
+    const timeoutId = window.setTimeout(() => {
+      void loadAcademyCourses();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseFilters.published]);
 

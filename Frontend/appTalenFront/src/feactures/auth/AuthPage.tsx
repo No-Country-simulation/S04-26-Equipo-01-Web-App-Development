@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import type { FC } from 'react';
 import {
   Box,
@@ -104,12 +104,15 @@ const validateRegisterPassword = (password: string): string | undefined => {
 export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, handleAdminLogin }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const oauthError = searchParams.get('oauthError');
   const [internalTab, setInternalTab] = useState<number>(externalTab ?? 0); // 0 = Iniciar sesión, 1 = Registrarse
   const queryRole = searchParams.get('role');
   const initialRole = queryRole === 'empresa' ? 'empresa' : 'talento';
   const [role, setRole] = useState<'talento' | 'empresa'>(initialRole);
   const [formData, setFormData] = useState({ email: '', password: '', name: '' });
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<FormErrors>(() =>
+    oauthError ? { general: oauthError } : {},
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRedirectingOAuth, setIsRedirectingOAuth] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -119,14 +122,6 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
   };
 
   const tab = externalTab ?? internalTab;
-
-  useEffect(() => {
-    const oauthError = searchParams.get('oauthError');
-
-    if (oauthError) {
-      setErrors((prev) => ({ ...prev, general: oauthError }));
-    }
-  }, [searchParams]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     if (externalTab !== undefined) {

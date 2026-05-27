@@ -715,14 +715,14 @@ const extractExperiences = (text: string): Experience[] => {
         continue;
       }
 
-      const candidateNormalized = candidate.replace(/^[•●oO\-\s]+/, '').trim();
+      const candidateNormalized = candidate.replace(/^[•●oO\s-]+/, '').trim();
       if (dateFirstLineRegex.test(candidateNormalized)) {
         break;
       }
 
-      if (/^[•●\-]/.test(candidate) || /^o\s+/i.test(candidate)) {
+      if (/^[•●-]/.test(candidate) || /^o\s+/i.test(candidate)) {
         const cleanedHighlight = cleanField(
-          candidate.replace(/^[•●oO\-\s]+/, ''),
+          candidate.replace(/^[•●oO\s-]+/, ''),
         );
         if (cleanedHighlight.length > 8) {
           highlights.push(cleanedHighlight);
@@ -872,7 +872,7 @@ const extractEducation = (text: string): Education[] => {
   const sectionSource = sectionMatch?.[1] ?? text;
   const sectionLines = splitMeaningfulLines(sectionSource);
   const dateRangeRegex = new RegExp(
-    `^(${SPANISH_MONTHS})\s*,?\s*(\d{4})\s*[–-]\s*(Actualidad|${SPANISH_MONTHS})\s*,?\s*(\d{4})?$`,
+    `^(${SPANISH_MONTHS})\\s*,?\\s*(\\d{4})\\s*[–-]\\s*(Actualidad|${SPANISH_MONTHS})\\s*,?\\s*(\\d{4})?$`,
     'i',
   );
 

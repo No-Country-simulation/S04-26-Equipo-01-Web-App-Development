@@ -609,17 +609,23 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     );
 
     if (!stillExists) {
-      setSelectedVacancyId('');
-      setVacancyPipeline(null);
-      setFeedbackDraftByCandidateId({});
-      setRequestForm(INITIAL_REQUEST_FORM);
-      setSelectedExistingSkill('');
-      setNewSkillName('');
-      setPipelineFeedback({
-        type: 'info',
-        message:
-          'La solicitud seleccionada ya no esta disponible. Se limpio el proceso y las skills seleccionadas.',
-      });
+      const timeoutId = window.setTimeout(() => {
+        setSelectedVacancyId('');
+        setVacancyPipeline(null);
+        setFeedbackDraftByCandidateId({});
+        setRequestForm(INITIAL_REQUEST_FORM);
+        setSelectedExistingSkill('');
+        setNewSkillName('');
+        setPipelineFeedback({
+          type: 'info',
+          message:
+            'La solicitud seleccionada ya no esta disponible. Se limpio el proceso y las skills seleccionadas.',
+        });
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
     }
   }, [myVacancies, selectedVacancyId]);
 
