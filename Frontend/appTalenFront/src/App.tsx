@@ -10,12 +10,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, CircularProgress, CssBaseline, Typography } from '@mui/material';
 import { Navbar } from './layout/Navbar';
 import { Footer } from './layout/Footer';
-import { LandingPage } from './feactures/landing/LandingPage';
-import { AuthPage } from './feactures/auth/AuthPage.tsx';
-import { TalentDashboard } from './feactures/profile/TalentDashboard';
-import { CompanyDashboard } from './feactures/marketplace/CompanyDashboard';
-import { AdminDashboard } from './feactures/admin/AdminDashboard';
-import { AcademyPro } from './feactures/academy/AcademyPro.tsx';
+import { LandingPage } from './features/landing/LandingPage';
+import { AuthPage } from './features/auth/AuthPage.tsx';
+import { TalentDashboard } from './features/profile/TalentDashboard';
+import { CompanyDashboard } from './features/marketplace/CompanyDashboard';
+import { AdminDashboard } from './features/admin/AdminDashboard';
+import { AcademyPro } from './features/academy/AcademyPro.tsx';
 import { getStoredAuthUser, loginAdmin } from './utils/admin-auth';
 import type { AuthUser } from './types/auth.types';
 

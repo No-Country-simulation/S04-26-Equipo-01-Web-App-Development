@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -17,16 +18,19 @@ import { AuthResponse } from './types/auth-response.type';
 import { UserRole } from '../../users/domain/user-role.enum';
 import { ExternalProfileDto } from './dto/external-profile.dto';
 import { AuthConnections } from '../domain/auth-connections.type';
+import { MailService } from '../../mail/application/mail.service';
 
 @Injectable()
 export class AuthService {
   private readonly jwtExpiresIn: string;
+  private readonly logger = new Logger(AuthService.name);
 
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) {
     this.jwtExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '7d');
   }
@@ -50,6 +54,7 @@ export class AuthService {
 
     try {
       const savedUser = await this.usersRepository.save(user);
+      await this.sendRegistrationEmail(savedUser.email);
       return this.buildAuthResponse(savedUser);
     } catch (error) {
       if (this.isUniqueViolation(error)) {
@@ -88,6 +93,7 @@ export class AuthService {
   ): Promise<AuthResponse> {
     const email = this.normalizeEmail(profile.email);
     let user = await this.usersRepository.findOne({ where: { email } });
+    let createdFromOAuth = false;
 
     if (!user) {
       const hashedPassword = await bcrypt.hash(profile.email, 10);
@@ -100,6 +106,7 @@ export class AuthService {
           provider === 'linkedin' ? profile.providerId : undefined,
       });
       user = await this.usersRepository.save(user);
+      createdFromOAuth = true;
     } else if (
       provider === 'linkedin' &&
       profile.providerId &&
@@ -109,7 +116,26 @@ export class AuthService {
       user = await this.usersRepository.save(user);
     }
 
+    if (createdFromOAuth) {
+      await this.sendRegistrationEmail(user.email);
+    }
+
     return this.buildAuthResponse(user);
+  }
+
+  private async sendRegistrationEmail(email: string): Promise<void> {
+    try {
+      await this.mailService.sendRegistrationConfirmation({
+        to: email,
+        recipientName: email,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown mail error';
+      this.logger.warn(
+        `Unable to send registration confirmation to ${email}: ${message}`,
+      );
+    }
   }
 
   async getMe(userId: string): Promise<AuthenticatedUser> {

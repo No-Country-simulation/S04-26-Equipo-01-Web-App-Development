@@ -1,4 +1,4 @@
-import api from '../feactures/api/axiosInterface';
+import api from '../features/api/axiosInterface';
 
 export interface CandidateProfile {
   id: string;

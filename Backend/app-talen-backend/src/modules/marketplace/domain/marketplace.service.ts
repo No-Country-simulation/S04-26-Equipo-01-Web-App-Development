@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -23,6 +24,7 @@ import { ModuleStatus } from '../../learning/domain/module-status.enum';
 import { CourseModule } from '../../courses/infrastructure/entities/course-module.entity';
 import { CompanyFeedback } from '../infrastructure/entities/company-feedback.entity';
 import { UpsertCandidateFeedbackDto } from '../application/dto/upsert-candidate-feedback.dto';
+import { MailService } from '../../mail/application/mail.service';
 
 interface CandidateFilters {
   name?: string;
@@ -54,6 +56,8 @@ const buildDefaultCompanyName = (email: string): string => {
 
 @Injectable()
 export class MarketplaceService {
+  private readonly logger = new Logger(MarketplaceService.name);
+
   constructor(
     @InjectRepository(Profile)
     private profileRepository: Repository<Profile>,
@@ -77,6 +81,7 @@ export class MarketplaceService {
     private readonly learningPathRepository: Repository<LearningPath>,
     @InjectRepository(CourseModule)
     private readonly courseModuleRepository: Repository<CourseModule>,
+    private readonly mailService: MailService,
   ) {}
 
   private parseCourseReferences(contentUrl?: string): {
@@ -360,6 +365,9 @@ export class MarketplaceService {
 
     const savedVacancy = await this.jobOpportunityRepository.save(vacancy);
 
+    await this.notifyVacancyCreated(savedVacancy.title, user.email, company.name);
+    await this.notifyTalentsNewVacancy(savedVacancy.title, company.name, user.id);
+
     return {
       id: savedVacancy.id,
       companyId: savedVacancy.companyId,
@@ -601,6 +609,14 @@ export class MarketplaceService {
     const saved =
       await this.candidateApplicationRepository.save(applicationToSave);
 
+    if (candidateProfile.user?.email) {
+      await this.notifyTalentStageUpdate(
+        candidateProfile.user.email,
+        vacancy.title,
+        stage,
+      );
+    }
+
     return {
       applicationId: saved.id,
       candidateId,
@@ -608,6 +624,83 @@ export class MarketplaceService {
       status: stage,
       matchedSkills,
     };
+  }
+
+  private async notifyVacancyCreated(
+    vacancyTitle: string,
+    companyEmail: string,
+    companyName: string,
+  ): Promise<void> {
+    try {
+      await this.mailService.sendVacancyCreatedNotification({
+        to: companyEmail,
+        vacancyTitle,
+        companyName,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown mail error';
+      this.logger.warn(
+        `Unable to send vacancy-created email to ${companyEmail}: ${message}`,
+      );
+    }
+  }
+
+  private async notifyTalentsNewVacancy(
+    vacancyTitle: string,
+    companyName: string,
+    companyUserId: string,
+  ): Promise<void> {
+    const talents = await this.userRepository.find({
+      where: { role: UserRole.TALENT },
+      select: { id: true, email: true },
+    });
+
+    for (const talent of talents) {
+      if (!talent.email || talent.id === companyUserId) {
+        continue;
+      }
+
+      try {
+        await this.mailService.sendTalentVacancyAvailableNotification({
+          to: talent.email,
+          vacancyTitle,
+          companyName,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'unknown mail error';
+        this.logger.warn(
+          `Unable to send new-vacancy email to ${talent.email}: ${message}`,
+        );
+      }
+    }
+  }
+
+  private async notifyTalentStageUpdate(
+    talentEmail: string,
+    vacancyTitle: string,
+    stage: PipelineStage,
+  ): Promise<void> {
+    const stageMap: Record<PipelineStage, 'PREAPROBADO' | 'APROBADO' | 'SELECCIONADO'> = {
+      SELECTED: 'PREAPROBADO',
+      FINALIST: 'APROBADO',
+      ACCEPTED: 'SELECCIONADO',
+    };
+
+    try {
+      await this.mailService.sendTalentPipelineUpdateNotification({
+        to: talentEmail,
+        vacancyTitle,
+        stage: stageMap[stage],
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown mail error';
+      this.logger.warn(
+        `Unable to send stage-update email to ${talentEmail}: ${message}`,
+      );
+    }
   }
 
   async upsertCandidateFeedback(

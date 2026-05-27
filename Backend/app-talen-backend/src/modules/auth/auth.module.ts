@@ -12,11 +12,13 @@ import { LinkedInAuthGuard } from './infrastructure/guards/linkedin-auth.guard';
 import { AuthController } from './infrastructure/auth.controller';
 import { LinkedInStrategy } from './infrastructure/strategies/linkedin.strategy';
 import { GoogleStrategy } from './infrastructure/strategies/google.strategy';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     ConfigModule,
     PassportModule,
+    MailModule,
     UsersModule,
     TypeOrmModule.forFeature([User]),
     JwtModule.registerAsync({

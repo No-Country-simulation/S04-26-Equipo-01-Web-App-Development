@@ -15,10 +15,12 @@ import { Company } from '../companies/infrastructure/entities/company.entity';
 import { Skill } from '../skills/infrastructure/entities/skill.entity';
 import { LearningPath } from '../learning/infrastructure/entities/learning-path.entity';
 import { CourseModule } from '../courses/infrastructure/entities/course-module.entity';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     AuthModule,
+    MailModule,
     TypeOrmModule.forFeature([
       JobOpportunity,
       CandidateApplication,

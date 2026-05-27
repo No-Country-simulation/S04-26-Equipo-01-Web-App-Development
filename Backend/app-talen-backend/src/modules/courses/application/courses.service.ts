@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -17,9 +18,13 @@ import { AddMeetingLinkDto } from './dto/add-meeting-link.dto';
 import { Course } from '../infrastructure/entities/course.entity';
 import { CourseModule } from '../infrastructure/entities/course-module.entity';
 import { MeetingLink } from '../infrastructure/entities/meeting-link.entity';
+import { User } from '../../users/infrastructure/entities/user.entity';
+import { MailService } from '../../mail/application/mail.service';
 
 @Injectable()
 export class CoursesService {
+  private readonly logger = new Logger(CoursesService.name);
+
   constructor(
     @InjectRepository(Course)
     private readonly coursesRepository: Repository<Course>,
@@ -27,6 +32,9 @@ export class CoursesService {
     private readonly courseModulesRepository: Repository<CourseModule>,
     @InjectRepository(MeetingLink)
     private readonly meetingLinksRepository: Repository<MeetingLink>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
+    private readonly mailService: MailService,
   ) {}
 
   async createCourse(
@@ -61,7 +69,10 @@ export class CoursesService {
         authUser.role === UserRole.COMPANY ? authUser.userId : undefined,
     });
 
-    return this.coursesRepository.save(course);
+    const savedCourse = await this.coursesRepository.save(course);
+    await this.notifyCourseCreated(authUser.userId, savedCourse.title);
+
+    return savedCourse;
   }
 
   async approveCourse(
@@ -323,7 +334,15 @@ export class CoursesService {
       addedBy: authUser.userId,
     });
 
-    return this.meetingLinksRepository.save(meetingLink);
+    const savedMeeting = await this.meetingLinksRepository.save(meetingLink);
+
+    await this.notifyWorkshopMeetingCreated(
+      authUser.userId,
+      course.title,
+      savedMeeting,
+    );
+
+    return savedMeeting;
   }
 
   async removeMeetingLink(
@@ -398,6 +417,69 @@ export class CoursesService {
       throw new ForbiddenException(
         'Only the course creator can modify its modules',
       );
+    }
+  }
+
+  private async notifyCourseCreated(
+    creatorUserId: string,
+    courseTitle: string,
+  ): Promise<void> {
+    const creator = await this.usersRepository.findOne({
+      where: { id: creatorUserId },
+    });
+
+    if (!creator?.email) {
+      return;
+    }
+
+    try {
+      await this.mailService.sendCourseCreatedNotification({
+        to: creator.email,
+        courseTitle,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown mail error';
+      this.logger.warn(
+        `Unable to send course created email to ${creator.email}: ${message}`,
+      );
+    }
+  }
+
+  private async notifyWorkshopMeetingCreated(
+    creatorUserId: string,
+    courseTitle: string,
+    meetingLink: MeetingLink,
+  ): Promise<void> {
+    const recipients = await this.usersRepository.find({
+      where: [{ role: UserRole.TALENT }, { id: creatorUserId }],
+      select: { email: true },
+    });
+
+    const emails = Array.from(
+      new Set(
+        recipients
+          .map((recipient) => recipient.email)
+          .filter((email): email is string => Boolean(email && email.trim())),
+      ),
+    );
+
+    for (const email of emails) {
+      try {
+        await this.mailService.sendWorkshopMeetingCreatedNotification({
+          to: email,
+          courseTitle,
+          platform: meetingLink.platform,
+          scheduledAt: meetingLink.scheduledAt,
+          url: meetingLink.url,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'unknown mail error';
+        this.logger.warn(
+          `Unable to send workshop meeting email to ${email}: ${message}`,
+        );
+      }
     }
   }
 }
