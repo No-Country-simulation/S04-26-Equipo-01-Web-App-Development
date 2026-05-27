@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MailModule } from '../mail/mail.module';
 import { UsersModule } from '../users/users.module';
 import { User } from '../users/infrastructure/entities/user.entity';
 import { AuthService } from './application/auth.service';
@@ -15,6 +16,7 @@ import { GoogleStrategy } from './infrastructure/strategies/google.strategy';
   imports: [
     ConfigModule,
     PassportModule,
+    MailModule,
     UsersModule,
     TypeOrmModule.forFeature([User]),
     JwtModule.registerAsync({
