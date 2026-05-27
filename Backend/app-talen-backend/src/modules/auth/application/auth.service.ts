@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Logger,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
+import { MailService } from '../../mail/application/mail.service';
 import { User } from '../../users/infrastructure/entities/user.entity';
 import { AuthenticatedUser } from '../domain/authenticated-user.type';
 import { AuthTokenPayload } from '../domain/auth-token-payload.type';
@@ -19,6 +21,7 @@ import { ExternalProfileDto } from './dto/external-profile.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly jwtExpiresIn: string;
 
   constructor(
@@ -26,6 +29,7 @@ export class AuthService {
     private readonly usersRepository: Repository<User>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) {
     this.jwtExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '7d');
   }
@@ -49,6 +53,7 @@ export class AuthService {
 
     try {
       const savedUser = await this.usersRepository.save(user);
+      this.queueRegistrationConfirmation(savedUser);
       return this.buildAuthResponse(savedUser);
     } catch (error) {
       if (this.isUniqueViolation(error)) {
@@ -100,6 +105,7 @@ export class AuthService {
         role: assignedRole,
       });
       user = await this.usersRepository.save(user);
+      this.queueRegistrationConfirmation(user, this.buildRecipientName(profile));
     }
 
     return this.buildAuthResponse(user);
@@ -141,6 +147,29 @@ export class AuthService {
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
+  }
+
+  private buildRecipientName(profile: ExternalProfileDto): string {
+    const fullName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
+
+    return fullName.length > 0 ? fullName : this.normalizeEmail(profile.email);
+  }
+
+  private queueRegistrationConfirmation(
+    user: User,
+    recipientName?: string,
+  ): void {
+    void this.mailService
+      .sendRegistrationConfirmation({
+        to: user.email,
+        recipientName,
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(
+          `Unable to send registration confirmation to ${user.email}: ${message}`,
+        );
+      });
   }
 
   private isUniqueViolation(error: unknown): boolean {
