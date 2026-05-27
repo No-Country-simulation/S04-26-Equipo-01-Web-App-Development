@@ -34,7 +34,7 @@ docker compose up --build
 La variable base usada por los archivos es:
 
 ```http
-@baseUrl = http://localhost:3001
+@baseUrl = http://localhost:3000
 ```
 
 Cuando un endpoint requiera autenticacion, primero ejecutar login o register y copiar el JWT en:

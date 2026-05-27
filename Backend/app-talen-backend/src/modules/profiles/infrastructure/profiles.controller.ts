@@ -14,11 +14,13 @@ import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../../auth/infrastructure/types/authenticated-request.type';
 import { AnalyzeCvDto } from '../application/dto/analyze-cv.dto';
 import { CreateProfileDto } from '../application/dto/create-profile.dto';
+import { ImportLinkedInCvDto } from '../application/dto/import-linkedin-cv.dto';
 import { SaveCvDiagnosticDto } from '../application/dto/save-cv-diagnostic.dto';
 import { UpdateInterestedRolesDto } from '../application/dto/update-interested-roles.dto';
 import { UpdateProfileDto } from '../application/dto/update-profile.dto';
 import { UpdateWorkPreferencesDto } from '../application/dto/update-work-preferences.dto';
 import { CvAnalysisResponse } from '../domain/cv-analysis-response.type';
+import { LinkedInCvImportResponse } from '../domain/linkedin-cv-import-response.type';
 import { UploadedCvFile } from '../domain/uploaded-cv-file.type';
 import { ProfilesService } from '../application/profiles.service';
 import { CvDiagnostic } from './entities/cv-diagnostic.entity';
@@ -235,6 +237,31 @@ export class ProfilesController {
     return this.profilesService.saveMyCvDiagnostic(
       request.user,
       saveCvDiagnosticDto,
+    );
+  }
+
+  @Post('me/cv/import-linkedin')
+  @ApiOperation({
+    summary: 'Importar CV desde perfil de LinkedIn (deshabilitado temporalmente)',
+    description:
+      'Este flujo está deshabilitado temporalmente. Mantiene compatibilidad con frontend mientras se prueba carga de CV por archivo.',
+  })
+  @ApiBody({
+    type: ImportLinkedInCvDto,
+    description: 'Payload de compatibilidad del flujo LinkedIn.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Respuesta de compatibilidad cuando LinkedIn está deshabilitado.',
+    type: Object,
+  })
+  importMyCvFromLinkedIn(
+    @Req() request: AuthenticatedRequest,
+    @Body() importLinkedInCvDto: ImportLinkedInCvDto,
+  ): Promise<LinkedInCvImportResponse> {
+    return this.profilesService.importMyCvFromLinkedIn(
+      request.user,
+      importLinkedInCvDto,
     );
   }
 

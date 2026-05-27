@@ -27,6 +27,7 @@ import {
   getCandidateConsolidatedData,
   moveCandidateToFinalist,
   moveCandidateToSelected,
+  upsertCandidateFeedback,
   type RecruiterSkillOption,
   type CreateVacancyPayload,
   type CandidateProfile as RealCandidateProfile,
@@ -357,16 +358,11 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       title: 'VACANTES / SOLICITUD',
       items: ['Crear Solicitud', 'Mis Solicitudes', 'Candidatos Preseleccionados', 'Seleccionados', 'Finalistas'],
     },
-    {
-      title: 'ACADEMIA PRO',
-      items: ['Cursos', 'Talleres'],
-    },
   ];
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     TALENTO: true,
     'VACANTES / SOLICITUD': true,
-    'ACADEMIA PRO': true,
   });
   const [selectedMenuItem, setSelectedMenuItem] = useState<string | null>(null);
   const [searchByName, setSearchByName] = useState('');
@@ -406,6 +402,10 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
   const [vacancyPipeline, setVacancyPipeline] = useState<VacancyPipeline | null>(null);
   const [loadingVacancyPipeline, setLoadingVacancyPipeline] = useState(false);
   const [updatingCandidateId, setUpdatingCandidateId] = useState<string | null>(null);
+  const [feedbackDraftByCandidateId, setFeedbackDraftByCandidateId] =
+    useState<Record<string, string>>({});
+  const [savingFeedbackCandidateId, setSavingFeedbackCandidateId] =
+    useState<string | null>(null);
 
   const [academyCourses, setAcademyCourses] = useState<Course[]>([]);
   const [loadingAcademyCourses, setLoadingAcademyCourses] = useState(false);
@@ -485,14 +485,74 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     [myVacancies, selectedVacancyId],
   );
 
+  const parseMultilineToArray = (text: string): string[] =>
+    text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => Boolean(line));
+
   const requestPayload = useMemo<CreateVacancyPayload>(() => ({
     title: requestForm.title.trim(),
+    area: requestForm.area.trim() || undefined,
     modality: requestForm.modality,
     location: requestForm.location.trim(),
+    contractType: requestForm.contractType,
+    seniority: requestForm.seniority,
+    salaryMin: requestForm.salaryMin ? Number(requestForm.salaryMin) : undefined,
+    salaryMax: requestForm.salaryMax ? Number(requestForm.salaryMax) : undefined,
     description: requestForm.description.trim(),
+    responsibilities: parseMultilineToArray(requestForm.responsibilitiesText),
     requiredSkills: requestForm.requiredSkills,
+    optionalSkills: parseMultilineToArray(requestForm.optionalSkillsText),
     vacancies: requestForm.vacancies,
   }), [requestForm]);
+
+  const clearVacancySelectionState = (options?: {
+    resetForm?: boolean;
+    clearMessages?: boolean;
+  }) => {
+    const resetForm = options?.resetForm ?? false;
+    const clearMessages = options?.clearMessages ?? false;
+
+    setSelectedVacancyId('');
+    setVacancyPipeline(null);
+    setFeedbackDraftByCandidateId({});
+
+    if (resetForm) {
+      setRequestForm(INITIAL_REQUEST_FORM);
+      setSelectedExistingSkill('');
+      setNewSkillName('');
+    }
+
+    if (clearMessages) {
+      setPipelineFeedback(null);
+      setRequestFeedback(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedVacancyId) {
+      return;
+    }
+
+    const stillExists = myVacancies.some(
+      (vacancy) => vacancy.id === selectedVacancyId,
+    );
+
+    if (!stillExists) {
+      setSelectedVacancyId('');
+      setVacancyPipeline(null);
+      setFeedbackDraftByCandidateId({});
+      setRequestForm(INITIAL_REQUEST_FORM);
+      setSelectedExistingSkill('');
+      setNewSkillName('');
+      setPipelineFeedback({
+        type: 'info',
+        message:
+          'La solicitud seleccionada ya no esta disponible. Se limpio el proceso y las skills seleccionadas.',
+      });
+    }
+  }, [myVacancies, selectedVacancyId]);
 
   const loadDashboardMetrics = async () => {
     setLoadingDashboardMetrics(true);
@@ -566,6 +626,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
   const loadVacancyPipeline = async (vacancyId: string) => {
     if (!vacancyId) {
       setVacancyPipeline(null);
+      setFeedbackDraftByCandidateId({});
       return;
     }
 
@@ -574,15 +635,75 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     try {
       const pipeline = await getVacancyPipeline(vacancyId);
       setVacancyPipeline(pipeline);
+      const pipelineCandidates = [
+        ...(pipeline?.selected || []),
+        ...(pipeline?.finalists || []),
+        ...(pipeline?.accepted || []),
+      ];
+      const nextDrafts = pipelineCandidates.reduce<Record<string, string>>(
+        (acc, candidate) => {
+          acc[candidate.id] = candidate.feedback || '';
+          return acc;
+        },
+        {},
+      );
+      setFeedbackDraftByCandidateId(nextDrafts);
     } catch (error) {
       console.warn('No se pudo cargar el pipeline de la vacante', error);
       setVacancyPipeline(null);
+      setFeedbackDraftByCandidateId({});
       setPipelineFeedback({
         type: 'error',
         message: 'No fue posible cargar el pipeline de candidatos de esta vacante.',
       });
     } finally {
       setLoadingVacancyPipeline(false);
+    }
+  };
+
+  const saveCandidateFeedback = async (candidateId: string) => {
+    if (!selectedVacancyId) {
+      setPipelineFeedback({
+        type: 'info',
+        message: 'Selecciona primero una vacante para guardar feedback.',
+      });
+      return;
+    }
+
+    const feedback = (feedbackDraftByCandidateId[candidateId] || '').trim();
+    if (!feedback) {
+      setPipelineFeedback({
+        type: 'info',
+        message: 'Escribe el feedback antes de guardarlo.',
+      });
+      return;
+    }
+
+    setSavingFeedbackCandidateId(candidateId);
+    try {
+      await upsertCandidateFeedback(selectedVacancyId, candidateId, feedback);
+      await loadVacancyPipeline(selectedVacancyId);
+      setPipelineFeedback({
+        type: 'success',
+        message: 'Feedback guardado correctamente para el candidato.',
+      });
+    } catch (error) {
+      const errorMessage =
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as { response?: { data?: { message?: string | string[] } } }).response?.data?.message !== 'undefined'
+          ? (error as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
+          : 'No se pudo guardar el feedback del candidato.';
+
+      setPipelineFeedback({
+        type: 'error',
+        message: Array.isArray(errorMessage)
+          ? errorMessage.join(', ')
+          : errorMessage || 'No se pudo guardar el feedback del candidato.',
+      });
+    } finally {
+      setSavingFeedbackCandidateId(null);
     }
   };
 
@@ -656,13 +777,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     setLoadingVacancies(true);
     try {
       const vacancies = await getMyVacancies();
-      setMyVacancies((previousVacancies) => {
-        if (selectedVacancyId && vacancies.length === 0 && previousVacancies.length > 0) {
-          return previousVacancies;
-        }
-
-        return vacancies;
-      });
+      setMyVacancies(vacancies);
     } catch (error) {
       console.warn('No se pudieron cargar vacantes creadas', error);
     } finally {
@@ -1165,10 +1280,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       await createVacancy(requestPayload);
       await loadMyCreatedVacancies();
       await loadDashboardMetrics();
-      setRequestForm(INITIAL_REQUEST_FORM);
-      setSelectedVacancyId('');
-      setSelectedExistingSkill('');
-      setNewSkillName('');
+      clearVacancySelectionState({ resetForm: true });
       setRequestFeedback({ type: 'success', message: 'Vacante creada correctamente.' });
     } catch (error) {
       console.error('No se pudo crear la vacante', error);
@@ -1182,6 +1294,39 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       const parsedMessage = Array.isArray(backendMessage)
         ? backendMessage.join(', ')
         : backendMessage;
+
+      const nonWhitelistedFields = Array.isArray(backendMessage)
+        ? backendMessage.filter(
+            (message): message is string =>
+              typeof message === 'string' && message.includes('should not exist'),
+          )
+        : [];
+
+      if (nonWhitelistedFields.length > 0) {
+        try {
+          const minimalPayload: CreateVacancyPayload = {
+            title: requestPayload.title,
+            description: requestPayload.description,
+            requiredSkills: requestPayload.requiredSkills,
+            location: requestPayload.location,
+            modality: requestPayload.modality,
+            vacancies: requestPayload.vacancies,
+          };
+
+          await createVacancy(minimalPayload);
+          await loadMyCreatedVacancies();
+          await loadDashboardMetrics();
+          clearVacancySelectionState({ resetForm: true });
+          setRequestFeedback({
+            type: 'info',
+            message:
+              'La solicitud se creo en modo compatible. Tu backend aun no soporta area, seniority, salario, responsabilidades, optionalSkills y contractType.',
+          });
+          return;
+        } catch (fallbackError) {
+          console.error('Tambien fallo la creacion minima de vacante', fallbackError);
+        }
+      }
 
       setRequestFeedback({
         type: 'error',
@@ -2106,12 +2251,13 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
           value={selectedVacancyId}
           onChange={(event) => {
             const vacancyId = event.target.value;
-            setSelectedVacancyId(vacancyId);
 
             if (!vacancyId) {
-              setRequestForm(INITIAL_REQUEST_FORM);
+              clearVacancySelectionState({ resetForm: true });
               return;
             }
+
+            setSelectedVacancyId(vacancyId);
 
             const selectedVacancy = myVacancies.find(
               (vacancy) => vacancy.id === vacancyId,
@@ -2121,10 +2267,28 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
             setRequestForm({
               ...INITIAL_REQUEST_FORM,
               title: selectedVacancy.title || '',
+              area: selectedVacancy.area || '',
               description: selectedVacancy.description || '',
               location: selectedVacancy.location || '',
               modality: normalizeModality(selectedVacancy.modality),
+              contractType:
+                (selectedVacancy.contractType as RecruiterRequestFormState['contractType']) ||
+                INITIAL_REQUEST_FORM.contractType,
+              seniority:
+                (selectedVacancy.seniority as RecruiterRequestFormState['seniority']) ||
+                INITIAL_REQUEST_FORM.seniority,
+              salaryMin:
+                typeof selectedVacancy.salaryMin === 'number'
+                  ? String(selectedVacancy.salaryMin)
+                  : '',
+              salaryMax:
+                typeof selectedVacancy.salaryMax === 'number'
+                  ? String(selectedVacancy.salaryMax)
+                  : '',
+              responsibilitiesText: (selectedVacancy.responsibilities || []).join('\n'),
               requiredSkills: selectedVacancy.requiredSkills || [],
+              optionalSkillsText: (selectedVacancy.optionalSkills || []).join('\n'),
+              vacancies: selectedVacancy.vacancies || INITIAL_REQUEST_FORM.vacancies,
             });
           }}
           helperText="Selecciona una vacante para cargar datos en el formulario"
@@ -2355,11 +2519,10 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
         <Button
           variant="outlined"
           onClick={() => {
-            setRequestForm(INITIAL_REQUEST_FORM);
-            setSelectedVacancyId('');
-            setSelectedExistingSkill('');
-            setNewSkillName('');
-            setRequestFeedback(null);
+            clearVacancySelectionState({
+              resetForm: true,
+              clearMessages: true,
+            });
           }}
           sx={{ textTransform: 'none', fontWeight: 700 }}
         >
@@ -2410,8 +2573,12 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     candidate: VacancyPipelineCandidate,
     actionLabel: string,
     action: 'selected' | 'finalist' | 'accepted',
+    options?: { allowFeedback?: boolean },
   ) => {
     const isUpdating = updatingCandidateId === candidate.id;
+    const allowFeedback = Boolean(options?.allowFeedback);
+    const draftFeedback = feedbackDraftByCandidateId[candidate.id] ?? candidate.feedback ?? '';
+    const isSavingFeedback = savingFeedbackCandidateId === candidate.id;
 
     return (
       <Card key={`${action}-${candidate.id}`} sx={{ border: '1px solid #D8E3F0', borderRadius: 2 }}>
@@ -2466,6 +2633,39 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
               />
             ))}
           </Box>
+
+          {allowFeedback && (
+            <Box sx={{ mt: 1.4, display: 'grid', gap: 1 }}>
+              <Typography sx={{ color: '#173A68', fontWeight: 700, fontSize: '0.9rem' }}>
+                Feedback del reclutador
+              </Typography>
+              <TextField
+                placeholder="Escribe aquí el feedback para el talento..."
+                multiline
+                minRows={3}
+                fullWidth
+                value={draftFeedback}
+                onChange={(event) =>
+                  setFeedbackDraftByCandidateId((previous) => ({
+                    ...previous,
+                    [candidate.id]: event.target.value,
+                  }))
+                }
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    void saveCandidateFeedback(candidate.id);
+                  }}
+                  disabled={isSavingFeedback}
+                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                >
+                  {isSavingFeedback ? 'Guardando feedback...' : 'Guardar feedback'}
+                </Button>
+              </Box>
+            </Box>
+          )}
         </CardContent>
       </Card>
     );
@@ -2489,6 +2689,11 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
             ? `Vacante seleccionada: ${selectedVacancy.title}`
             : 'Selecciona una vacante en Mis Solicitudes para ver sus preseleccionados.'}
         </Typography>
+
+        <Alert severity="info" sx={{ mt: 1.4 }}>
+          El feedback del reclutador se habilita cuando el candidato pasa a
+          Seleccionados o Finalistas.
+        </Alert>
 
         {pipelineFeedback && (
           <Alert severity={pipelineFeedback.type} sx={{ mt: 1.4 }}>
@@ -2532,7 +2737,8 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
               )
             ) : (
               <Alert severity="info">
-                No hay candidatos con al menos una skill que coincida con la vacante seleccionada.
+                No hay candidatos preseleccionados para esta vacante. Verifica que
+                exista talento con skills que hagan match con los requerimientos.
               </Alert>
             )}
           </Box>
@@ -2542,6 +2748,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
           <Button
             variant="outlined"
             onClick={() => {
+              clearVacancySelectionState({ clearMessages: true });
               setSelectedMenuItem('Mis Solicitudes');
               void loadMyCreatedVacancies();
             }}
@@ -2590,6 +2797,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
               candidate,
               'Pasar a Finalista',
               'finalist',
+              { allowFeedback: true },
             ),
           )
         ) : (
@@ -2643,6 +2851,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
                 candidate,
                 'Reclutar',
                 'accepted',
+                { allowFeedback: true },
               ),
             )
           ) : (
@@ -2660,6 +2869,11 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
                 <CardContent>
                   <Typography sx={{ fontWeight: 800, color: '#1D7A3D' }}>{candidate.fullName}</Typography>
                   <Typography sx={{ color: '#3E6B52' }}>{candidate.title} · {candidate.location}</Typography>
+                  {candidate.feedback && (
+                    <Typography sx={{ mt: 1, color: '#2B4D3A', fontSize: '0.92rem' }}>
+                      Feedback: {candidate.feedback}
+                    </Typography>
+                  )}
                 </CardContent>
               </Card>
             ))
@@ -3396,20 +3610,22 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Box
           sx={{
-            height: 58,
+            minHeight: 58,
             bgcolor: '#F8FBFF',
             borderBottom: '1px solid #D7E1EC',
             px: { xs: 2, md: 4 },
+            py: { xs: 1.2, md: 0 },
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: 1.5,
+            flexWrap: { xs: 'wrap', md: 'nowrap' },
           }}
         >
-          <Typography sx={{ fontWeight: 700, color: '#1F3557' }}>
+          <Typography sx={{ fontWeight: 700, color: '#1F3557', fontSize: { xs: '0.95rem', md: '1rem' } }}>
             Dashboard Reclutador: {user?.name || 'Empresa'}
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'flex-end', md: 'flex-start' } }}>
             <Typography sx={{ fontWeight: 700, color: '#1F3557' }}>Hola, Recruiter</Typography>
             <Avatar sx={{ width: 34, height: 34, bgcolor: '#E5741F', color: '#fff', fontWeight: 700 }}>
               R
@@ -3418,6 +3634,33 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
         </Box>
 
         <Box sx={{ p: { xs: 2, md: 4 } }}>
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, gap: 1, overflowX: 'auto', pb: 1.2, mb: 1.2 }}>
+            {sidebarSections.flatMap((section) =>
+              section.items.map((item) => (
+                <Button
+                  key={`mobile-company-${item}`}
+                  size="small"
+                  variant={selectedMenuItem === item ? 'contained' : 'outlined'}
+                  onClick={() => {
+                    void handleMenuSelection(item);
+                  }}
+                  sx={{
+                    whiteSpace: 'nowrap',
+                    textTransform: 'none',
+                    borderColor: '#173A68',
+                    color: selectedMenuItem === item ? '#fff' : '#173A68',
+                    bgcolor: selectedMenuItem === item ? '#173A68' : 'transparent',
+                    '&:hover': {
+                      bgcolor: selectedMenuItem === item ? '#112D51' : 'rgba(23,58,104,0.08)',
+                    },
+                  }}
+                >
+                  {item}
+                </Button>
+              )),
+            )}
+          </Box>
+
           {selectedMenuItem === null ? (
             <>
               <Paper

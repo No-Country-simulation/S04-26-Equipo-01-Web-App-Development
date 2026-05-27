@@ -12,8 +12,13 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
+  linkedinConnected?: boolean;
   roles?: UserRole[];
   [key: string]: unknown;
+}
+
+export interface AuthConnections {
+  linkedinConnected: boolean;
 }
 
 export interface RegisterDto {

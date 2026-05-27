@@ -36,7 +36,7 @@ export class AiCvService {
         contents: JSON.stringify({ cvText }),
         config: {
           systemInstruction:
-            'Eres un asistente de empleabilidad. Analiza CVs para sugerir datos de perfil, assessment inicial y skills. Responde en espanol neutro. No inventes datos personales que no esten en el CV; si algo no aparece, omite el campo.',
+            'Eres un asistente de empleabilidad. Analiza CVs para sugerir datos de perfil, assessment inicial y skills. Responde en espanol neutro. No inventes datos personales que no esten en el CV; si algo no aparece, omite el campo. Clasifica skills tecnicas como competencias del oficio o profesion (ej: medico, contador, administrador, desarrollador, mecanico, militar) y skills personales como habilidades blandas (ej: comunicacion, liderazgo, empatia).',
           responseMimeType: 'application/json',
           responseJsonSchema: this.getCvAnalysisSchema(),
         },

@@ -9,6 +9,25 @@ const api = axios.create({
     }
 });
 
+const isSeedAdminSession = (): boolean => {
+    const token = localStorage.getItem('token');
+    if (token !== 'admin-token') {
+        return false;
+    }
+
+    const authUser = localStorage.getItem('authUser');
+    if (!authUser) {
+        return false;
+    }
+
+    try {
+        const parsedUser = JSON.parse(authUser) as { role?: string; email?: string };
+        return parsedUser.role === 'ADMIN' && parsedUser.email === 'admin01@admin.com';
+    } catch {
+        return false;
+    }
+};
+
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -24,7 +43,7 @@ api.interceptors.response.use(
             const requestUrl = error.config?.url ?? '';
             const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
 
-            if (!isAuthEndpoint) {
+            if (!isAuthEndpoint && !isSeedAdminSession()) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('authUser');
 

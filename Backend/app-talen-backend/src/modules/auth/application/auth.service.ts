@@ -16,6 +16,7 @@ import { RegisterDto } from './dto/register.dto';
 import { AuthResponse } from './types/auth-response.type';
 import { UserRole } from '../../users/domain/user-role.enum';
 import { ExternalProfileDto } from './dto/external-profile.dto';
+import { AuthConnections } from '../domain/auth-connections.type';
 
 @Injectable()
 export class AuthService {
@@ -83,6 +84,7 @@ export class AuthService {
   async loginWithExternalProvider(
     profile: ExternalProfileDto,
     defaultRole: UserRole = UserRole.TALENT,
+    provider: 'google' | 'linkedin' = 'google',
   ): Promise<AuthResponse> {
     const email = this.normalizeEmail(profile.email);
     let user = await this.usersRepository.findOne({ where: { email } });
@@ -94,7 +96,16 @@ export class AuthService {
         password: hashedPassword,
         imageUrl: profile.picture,
         role: defaultRole,
+        linkedinProviderId:
+          provider === 'linkedin' ? profile.providerId : undefined,
       });
+      user = await this.usersRepository.save(user);
+    } else if (
+      provider === 'linkedin' &&
+      profile.providerId &&
+      user.linkedinProviderId !== profile.providerId
+    ) {
+      user.linkedinProviderId = profile.providerId;
       user = await this.usersRepository.save(user);
     }
 
@@ -111,6 +122,20 @@ export class AuthService {
     }
 
     return this.toAuthenticatedUser(user);
+  }
+
+  async getMyConnections(userId: string): Promise<AuthConnections> {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    return {
+      linkedinConnected: Boolean(user.linkedinProviderId),
+    };
   }
 
   private buildAuthResponse(user: User): AuthResponse {
@@ -132,6 +157,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       role: user.role,
+      linkedinConnected: Boolean(user.linkedinProviderId),
     };
   }
 

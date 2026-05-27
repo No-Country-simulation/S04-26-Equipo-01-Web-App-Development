@@ -4,6 +4,7 @@ import { CandidateApplication } from './infrastructure/entities/candidate-applic
 import { CompanyFeedback } from './infrastructure/entities/company-feedback.entity';
 import { JobOpportunity } from './infrastructure/entities/job-opportunity.entity';
 import { RecruiterController } from './infrastructure/recruiter.controller';
+import { MarketplaceController } from './infrastructure/marketplace.controller';
 import { MarketplaceService } from './domain/marketplace.service';
 import { Profile } from '../profiles/infrastructure/entities/profile.entity';
 import { UserSkill } from '../skills/infrastructure/entities/user-skill.entity';
@@ -32,7 +33,7 @@ import { CourseModule } from '../courses/infrastructure/entities/course-module.e
       CourseModule,
     ]),
   ],
-  controllers: [RecruiterController],
+  controllers: [RecruiterController, MarketplaceController],
   providers: [MarketplaceService],
   exports: [TypeOrmModule, MarketplaceService],
 })

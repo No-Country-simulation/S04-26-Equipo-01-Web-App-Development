@@ -21,6 +21,8 @@ import { ApplicationStatus } from './application-status.enum';
 import { LearningPath } from '../../learning/infrastructure/entities/learning-path.entity';
 import { ModuleStatus } from '../../learning/domain/module-status.enum';
 import { CourseModule } from '../../courses/infrastructure/entities/course-module.entity';
+import { CompanyFeedback } from '../infrastructure/entities/company-feedback.entity';
+import { UpsertCandidateFeedbackDto } from '../application/dto/upsert-candidate-feedback.dto';
 
 interface CandidateFilters {
   name?: string;
@@ -40,6 +42,7 @@ export interface PipelineCandidate {
   skillsValidated: string[];
   matchedSkills: string[];
   matchCount: number;
+  feedback?: string | null;
 }
 
 const buildDefaultCompanyName = (email: string): string => {
@@ -66,6 +69,8 @@ export class MarketplaceService {
     private jobOpportunityRepository: Repository<JobOpportunity>,
     @InjectRepository(CandidateApplication)
     private candidateApplicationRepository: Repository<CandidateApplication>,
+    @InjectRepository(CompanyFeedback)
+    private companyFeedbackRepository: Repository<CompanyFeedback>,
     @InjectRepository(Skill)
     private readonly skillsCatalogRepository: Repository<Skill>,
     @InjectRepository(LearningPath)
@@ -215,6 +220,7 @@ export class MarketplaceService {
   private mapProfileToPipelineCandidate(
     profile: Profile,
     matchedSkills: string[],
+    feedback?: string | null,
   ): PipelineCandidate {
     const normalizedSkills = this.getCandidateSkillNames(profile).map((skill) =>
       skill.toLowerCase(),
@@ -228,6 +234,7 @@ export class MarketplaceService {
       skillsValidated: normalizedSkills,
       matchedSkills,
       matchCount: matchedSkills.length,
+      feedback: feedback || null,
     };
   }
 
@@ -417,6 +424,7 @@ export class MarketplaceService {
         'profile.skills',
         'profile.skills.skill',
         'profile.cvDiagnostics',
+        'feedback',
       ],
       order: { createdAt: 'ASC' },
     });
@@ -473,6 +481,7 @@ export class MarketplaceService {
       const candidate = this.mapProfileToPipelineCandidate(
         profile,
         matchedSkills,
+        application?.feedback?.comments || null,
       );
       pushByStatus(candidate, application?.status);
     });
@@ -599,6 +608,125 @@ export class MarketplaceService {
       status: stage,
       matchedSkills,
     };
+  }
+
+  async upsertCandidateFeedback(
+    userId: string,
+    vacancyId: string,
+    candidateId: string,
+    payload: UpsertCandidateFeedbackDto,
+  ) {
+    await this.getOwnedVacancy(userId, vacancyId);
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user || user.role !== UserRole.COMPANY) {
+      throw new ForbiddenException(
+        'Solo usuarios empresa pueden guardar feedback de candidatos.',
+      );
+    }
+
+    const company = await this.ensureCompanyForUser(user);
+
+    const application = await this.candidateApplicationRepository.findOne({
+      where: {
+        profileId: candidateId,
+        opportunityId: vacancyId,
+      },
+      relations: ['feedback'],
+    });
+
+    if (!application) {
+      throw new NotFoundException(
+        'No existe una postulacion para este candidato en la vacante indicada.',
+      );
+    }
+
+    const normalizedStatus = this.normalizePipelineStatus(application.status);
+    if (
+      ![
+        ApplicationStatus.CONTACTED,
+        ApplicationStatus.FINALIST,
+        ApplicationStatus.HIRED,
+      ].includes(normalizedStatus)
+    ) {
+      throw new BadRequestException(
+        'Solo puedes registrar feedback para candidatos seleccionados, finalistas o aceptados.',
+      );
+    }
+
+    const existingFeedback = application.feedback
+      ? application.feedback
+      : await this.companyFeedbackRepository.findOne({
+          where: { applicationId: application.id },
+        });
+
+    const feedback = existingFeedback
+      ? {
+          ...existingFeedback,
+          comments: payload.feedback.trim(),
+          companyId: company.id,
+          applicationId: application.id,
+        }
+      : this.companyFeedbackRepository.create({
+          companyId: company.id,
+          applicationId: application.id,
+          comments: payload.feedback.trim(),
+        });
+
+    const savedFeedback = await this.companyFeedbackRepository.save(feedback);
+
+    return {
+      id: savedFeedback.id,
+      vacancyId,
+      candidateId,
+      feedback: savedFeedback.comments || '',
+      createdAt: savedFeedback.createdAt,
+    };
+  }
+
+  async getMyTalentFeedback(userId: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user || user.role !== UserRole.TALENT) {
+      throw new ForbiddenException(
+        'Solo usuarios talento pueden consultar su feedback de postulaciones.',
+      );
+    }
+
+    const profile = await this.profileRepository.findOne({
+      where: { userId },
+    });
+
+    if (!profile) {
+      return [];
+    }
+
+    const applications = await this.candidateApplicationRepository.find({
+      where: { profileId: profile.id },
+      relations: ['opportunity', 'feedback'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return applications
+      .filter((application) => {
+        const normalizedStatus = this.normalizePipelineStatus(application.status);
+        return (
+          [
+            ApplicationStatus.CONTACTED,
+            ApplicationStatus.FINALIST,
+            ApplicationStatus.HIRED,
+          ].includes(normalizedStatus) &&
+          Boolean(application.feedback?.comments?.trim())
+        );
+      })
+      .map((application) => ({
+        applicationId: application.id,
+        vacancyId: application.opportunityId,
+        vacancyTitle: application.opportunity?.title || 'Vacante',
+        stage: this.normalizePipelineStatus(application.status),
+        feedback: application.feedback?.comments || '',
+        createdAt: application.feedback?.createdAt || application.createdAt,
+      }));
   }
 
   /**
