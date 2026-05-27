@@ -13,7 +13,7 @@ import { AuthService } from '../application/auth.service';
 import { LoginDto } from '../application/dto/login.dto';
 import { RegisterDto } from '../application/dto/register.dto';
 import { AuthResponse } from '../application/types/auth-response.type';
-import type { AuthenticatedUser } from '../domain/authenticated-user.type';
+import { AuthenticatedUser } from '../domain/authenticated-user.type';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from './types/authenticated-request.type';
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
@@ -26,10 +26,12 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
+  ApiConflictResponse,
 } from '@nestjs/swagger';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { LinkedInAuthGuard } from './guards/linkedin-auth.guard';
-import { ConfigService } from 'node_modules/@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 
 export const GetUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): ExternalProfileDto => {
@@ -57,7 +59,10 @@ export class AuthController {
   @ApiResponse({
     status: 201,
     description: 'Usuario registrado y autenticado.',
-    type: Object,
+    type: AuthResponse,
+  })
+  @ApiConflictResponse({
+    description: 'Ya existe un usuario con ese correo.',
   })
   register(@Body() registerDto: RegisterDto): Promise<AuthResponse> {
     return this.authService.register(registerDto);
@@ -72,7 +77,10 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Usuario autenticado.',
-    type: Object,
+    type: AuthResponse,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Credenciales inválidas.',
   })
   @HttpCode(HttpStatus.OK)
   login(@Body() loginDto: LoginDto): Promise<AuthResponse> {
@@ -88,7 +96,10 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description: 'Usuario autenticado.',
-    type: Object,
+    type: AuthenticatedUser,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Token inválido o ausente.',
   })
   @UseGuards(JwtAuthGuard)
   me(@Req() request: AuthenticatedRequest): Promise<AuthenticatedUser> {

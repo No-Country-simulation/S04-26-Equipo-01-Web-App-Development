@@ -5,16 +5,22 @@ import { AssessmentService } from '../application/assessment.service';
 import { CreateAssessmentTestDto } from '../application/dto/create-assessment-test.dto';
 import { CreateAssessmentDto } from '../application/dto/create-assessment.dto';
 import { SubmitAssessmentTestDto } from '../application/dto/submit-assessment-test.dto';
-import { GeneratedTestsResponseDto } from '../application/dto/generated-tests-response.dto';
+import {
+  AssessmentTestQuestionDto,
+  GeneratedTestsResponseDto,
+} from '../application/dto/generated-tests-response.dto';
 import { AssessmentTestQuestion } from '../domain/assessment-test-question.type';
 import { AssessmentTestResultEntity } from './entities/assessment-test-result.entity';
 import { Assessment } from './entities/assessment.entity';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiBadRequestResponse,
+  ApiForbiddenResponse,
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
 @ApiTags('Evaluaciones')
@@ -32,6 +38,11 @@ export class AssessmentController {
   @ApiBody({
     type: CreateAssessmentDto,
     description: 'Datos para crear la evaluaciÃ³n.',
+  })
+  @ApiBadRequestResponse({ description: 'Datos de evaluación inválidos.' })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente.' })
+  @ApiForbiddenResponse({
+    description: 'Solo usuarios TALENT pueden crear evaluaciones.',
   })
   @ApiResponse({
     status: 201,
@@ -56,6 +67,10 @@ export class AssessmentController {
     description: 'Lista de evaluaciones.',
     type: [Assessment],
   })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente.' })
+  @ApiForbiddenResponse({
+    description: 'Solo usuarios TALENT pueden listar evaluaciones.',
+  })
   findMine(@Req() request: AuthenticatedRequest): Promise<Assessment[]> {
     return this.assessmentService.findMine(request.user);
   }
@@ -70,6 +85,10 @@ export class AssessmentController {
     status: 200,
     description: 'Ãšltima evaluaciÃ³n.',
     type: Assessment,
+  })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente.' })
+  @ApiForbiddenResponse({
+    description: 'Solo usuarios TALENT pueden consultar evaluaciones.',
   })
   findMyLatest(@Req() request: AuthenticatedRequest): Promise<Assessment> {
     return this.assessmentService.findMyLatest(request.user);
@@ -86,6 +105,10 @@ export class AssessmentController {
     description: 'Evaluacion consolidada creada.',
     type: Assessment,
   })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente.' })
+  @ApiForbiddenResponse({
+    description: 'Solo usuarios TALENT pueden consolidar evaluaciones.',
+  })
   consolidateMyAssessment(
     @Req() request: AuthenticatedRequest,
   ): Promise<Assessment> {
@@ -100,7 +123,11 @@ export class AssessmentController {
   @ApiResponse({
     status: 200,
     description: 'Preguntas del test psicotÃ©cnico.',
-    type: [Object],
+    type: [AssessmentTestQuestionDto],
+  })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente.' })
+  @ApiForbiddenResponse({
+    description: 'Solo usuarios TALENT pueden consultar preguntas.',
   })
   getPsychotechnicalQuestions(): AssessmentTestQuestion[] {
     return this.assessmentService.getPsychotechnicalQuestions();
@@ -116,6 +143,10 @@ export class AssessmentController {
     description: 'Tests generados exitosamente.',
     type: GeneratedTestsResponseDto,
   })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente.' })
+  @ApiForbiddenResponse({
+    description: 'Solo usuarios TALENT pueden generar tests.',
+  })
   async generateTestsForProfile(
     @Req() request: AuthenticatedRequest,
   ): Promise<GeneratedTestsResponseDto> {
@@ -130,7 +161,11 @@ export class AssessmentController {
   @ApiResponse({
     status: 200,
     description: 'Preguntas del test tÃ©cnico.',
-    type: [Object],
+    type: [AssessmentTestQuestionDto],
+  })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente.' })
+  @ApiForbiddenResponse({
+    description: 'Solo usuarios TALENT pueden consultar preguntas.',
   })
   getTechnicalQuestions(): AssessmentTestQuestion[] {
     return this.assessmentService.getTechnicalQuestions();
@@ -145,6 +180,13 @@ export class AssessmentController {
   @ApiBody({
     type: SubmitAssessmentTestDto,
     description: 'Respuestas del test psicotÃ©cnico.',
+  })
+  @ApiBadRequestResponse({
+    description: 'Respuestas del test psicotécnico inválidas.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente.' })
+  @ApiForbiddenResponse({
+    description: 'Solo usuarios TALENT pueden enviar resultados de tests.',
   })
   @ApiResponse({
     status: 201,
@@ -193,6 +235,13 @@ export class AssessmentController {
   @ApiBody({
     type: CreateAssessmentTestDto,
     description: 'Datos del resultado del test psicotÃ©cnico.',
+  })
+  @ApiBadRequestResponse({
+    description: 'Resultado del test psicotécnico inválido.',
+  })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente.' })
+  @ApiForbiddenResponse({
+    description: 'Solo usuarios TALENT pueden crear resultados.',
   })
   @ApiResponse({
     status: 201,
