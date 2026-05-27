@@ -27,6 +27,7 @@ import {
   getCandidateConsolidatedData,
   moveCandidateToFinalist,
   moveCandidateToSelected,
+  upsertCandidateFeedback,
   type RecruiterSkillOption,
   type CreateVacancyPayload,
   type CandidateProfile as RealCandidateProfile,
@@ -34,6 +35,40 @@ import {
   type VacancyPipeline,
   type VacancyPipelineCandidate,
 } from '../../services/recruiter.service';
+import {
+  addCourseMeetingLink,
+  addCourseModule,
+  approveCourse,
+  archiveCourse,
+  createCourse,
+  deleteCourseMeetingLink,
+  deleteCourseModule,
+  listCourses,
+  listMyCompanyCourses,
+  updateCourse,
+} from '../../services/course.service';
+import {
+  generateMyLearningPath,
+  getMyLearningModules,
+  getMyLearningPaths,
+  updateMyModuleProgress,
+} from '../../services/learning.service';
+import {
+  type AddMeetingLinkDto,
+  CourseStatus,
+  MeetingPlatform,
+  type Course,
+  type CourseStatus as CourseStatusType,
+  type CreateCourseDto,
+  type CreateCourseModuleDto,
+  type MeetingPlatform as MeetingPlatformType,
+} from '../../types/course.types';
+import {
+  ModuleStatus as LearningModuleStatus,
+  type LearningModule,
+  type LearningPath,
+  type ModuleStatus,
+} from '../../types/learning.types';
 import VacancyTable from './VacancyTable';
 
 interface CompanyDashboardProps {
@@ -84,9 +119,20 @@ interface CandidateProfileDetail {
   courses?: Array<{
     id?: string;
     title?: string;
+    description?: string;
     status?: 'pending' | 'in_progress' | 'completed' | string;
     progress?: number;
+    modules?: number;
+    completedModules?: number;
   }>;
+  learningPath?: {
+    id?: string;
+    status?: string;
+    progress?: number;
+    title?: string;
+    objective?: string;
+    modules?: Array<Record<string, unknown>>;
+  } | null;
 }
 
 interface CandidateProfile {
@@ -131,6 +177,46 @@ interface SkillOption {
   category: string;
 }
 
+interface DashboardMetrics {
+  openVacancies: number;
+  availableCandidates: number;
+  preselectedCandidates: number;
+  selectedCandidates: number;
+  finalistCandidates: number;
+  finishedRecruitmentProcesses: number;
+}
+
+interface CourseFormState {
+  title: string;
+  description: string;
+  status: CourseStatusType;
+}
+
+interface CourseModuleFormState {
+  courseId: string;
+  title: string;
+  description: string;
+  order: number;
+  videoUrl: string;
+  documentationUrl: string;
+  durationMin: string;
+}
+
+interface CourseMeetingFormState {
+  courseId: string;
+  url: string;
+  platform: MeetingPlatformType;
+  scheduledDate: string;
+  scheduledTime: string;
+  password: string;
+  notes: string;
+}
+
+interface WorkshopGenerateFormState {
+  title: string;
+  objective: string;
+}
+
 const mapRecruiterSkillToOption = (skill: RecruiterSkillOption): SkillOption => ({
   id: skill.id,
   name: skill.name,
@@ -153,10 +239,54 @@ const INITIAL_REQUEST_FORM: RecruiterRequestFormState = {
   optionalSkillsText: '',
 };
 
+const INITIAL_COURSE_FORM: CourseFormState = {
+  title: '',
+  description: '',
+  status: CourseStatus.DRAFT,
+};
+
+const INITIAL_COURSE_MODULE_FORM: CourseModuleFormState = {
+  courseId: '',
+  title: '',
+  description: '',
+  order: 1,
+  videoUrl: '',
+  documentationUrl: '',
+  durationMin: '',
+};
+
+const INITIAL_COURSE_MEETING_FORM: CourseMeetingFormState = {
+  courseId: '',
+  url: '',
+  platform: MeetingPlatform.GOOGLE_MEET,
+  scheduledDate: '',
+  scheduledTime: '',
+  password: '',
+  notes: '',
+};
+
+const INITIAL_WORKSHOP_GENERATE_FORM: WorkshopGenerateFormState = {
+  title: '',
+  objective: '',
+};
+
+const INITIAL_DASHBOARD_METRICS: DashboardMetrics = {
+  openVacancies: 0,
+  availableCandidates: 0,
+  preselectedCandidates: 0,
+  selectedCandidates: 0,
+  finalistCandidates: 0,
+  finishedRecruitmentProcesses: 0,
+};
+
 export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [candidatesError, setCandidatesError] = useState<string | null>(null);
+  const [dashboardMetrics, setDashboardMetrics] =
+    useState<DashboardMetrics>(INITIAL_DASHBOARD_METRICS);
+  const [loadingDashboardMetrics, setLoadingDashboardMetrics] =
+    useState(false);
 
   const loadCandidates = async () => {
     setLoadingCandidates(true);
@@ -213,9 +343,78 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     }
   };
 
+  const loadDashboardMetrics = async () => {
+    setLoadingDashboardMetrics(true);
+
+    try {
+      const [vacancies, candidatePool] = await Promise.all([
+        getMyVacancies(),
+        getCandidates(),
+      ]);
+
+      const pipelines = await Promise.all(
+        vacancies.map(async (vacancy) => {
+          const pipeline = await getVacancyPipeline(vacancy.id);
+          return pipeline;
+        }),
+      );
+
+      const accumulated = pipelines.reduce(
+        (metrics, pipeline) => {
+          if (!pipeline) {
+            return metrics;
+          }
+
+          const preselected = pipeline.preselected?.length || 0;
+          const selected = pipeline.selected?.length || 0;
+          const finalists = pipeline.finalists?.length || 0;
+          const accepted = pipeline.accepted?.length || 0;
+
+          metrics.preselectedCandidates += preselected;
+          metrics.selectedCandidates += selected;
+          metrics.finalistCandidates += finalists;
+
+          if (accepted > 0) {
+            metrics.finishedRecruitmentProcesses += 1;
+          }
+
+          return metrics;
+        },
+        {
+          ...INITIAL_DASHBOARD_METRICS,
+        },
+      );
+
+      const availableCandidatesCount =
+        accumulated.preselectedCandidates +
+        accumulated.selectedCandidates +
+        accumulated.finalistCandidates;
+
+      const finishedRecruitmentProcesses =
+        accumulated.finishedRecruitmentProcesses;
+
+      setDashboardMetrics({
+        openVacancies: Math.max(vacancies.length - finishedRecruitmentProcesses, 0),
+        availableCandidates:
+          availableCandidatesCount > 0
+            ? availableCandidatesCount
+            : candidatePool.length,
+        preselectedCandidates: accumulated.preselectedCandidates,
+        selectedCandidates: accumulated.selectedCandidates,
+        finalistCandidates: accumulated.finalistCandidates,
+        finishedRecruitmentProcesses,
+      });
+    } catch (error) {
+      console.warn('No se pudieron calcular metricas del dashboard', error);
+      setDashboardMetrics(INITIAL_DASHBOARD_METRICS);
+    } finally {
+      setLoadingDashboardMetrics(false);
+    }
+  };
+
   useEffect(() => {
     const timerId = window.setTimeout(() => {
-      void loadCandidates();
+      void Promise.all([loadCandidates(), loadDashboardMetrics()]);
     }, 0);
 
     return () => {
@@ -232,16 +431,11 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       title: 'VACANTES / SOLICITUD',
       items: ['Crear Solicitud', 'Mis Solicitudes', 'Candidatos Preseleccionados', 'Seleccionados', 'Finalistas'],
     },
-    {
-      title: 'ACADEMIA PRO',
-      items: ['Cursos', 'Talleres'],
-    },
   ];
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     TALENTO: true,
     'VACANTES / SOLICITUD': true,
-    'ACADEMIA PRO': true,
   });
   const [selectedMenuItem, setSelectedMenuItem] = useState<string | null>(null);
   const [searchByName, setSearchByName] = useState('');
@@ -277,24 +471,168 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
   const [vacancyPipeline, setVacancyPipeline] = useState<VacancyPipeline | null>(null);
   const [loadingVacancyPipeline, setLoadingVacancyPipeline] = useState(false);
   const [updatingCandidateId, setUpdatingCandidateId] = useState<string | null>(null);
+  const [feedbackDraftByCandidateId, setFeedbackDraftByCandidateId] =
+    useState<Record<string, string>>({});
+  const [savingFeedbackCandidateId, setSavingFeedbackCandidateId] =
+    useState<string | null>(null);
+
+  const [academyCourses, setAcademyCourses] = useState<Course[]>([]);
+  const [loadingAcademyCourses, setLoadingAcademyCourses] = useState(false);
+  const [courseFilters, setCourseFilters] = useState<{ published: boolean }>({
+    published: false,
+  });
+  const [courseForm, setCourseForm] = useState<CourseFormState>(
+    INITIAL_COURSE_FORM,
+  );
+  const [courseModuleForm, setCourseModuleForm] =
+    useState<CourseModuleFormState>(INITIAL_COURSE_MODULE_FORM);
+  const [courseMeetingForm, setCourseMeetingForm] =
+    useState<CourseMeetingFormState>(INITIAL_COURSE_MEETING_FORM);
+  const [academyFeedback, setAcademyFeedback] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+  const [savingCourseAction, setSavingCourseAction] = useState(false);
+  const [expandedCourseId, setExpandedCourseId] = useState<string | null>(null);
+
+  const [myLearningPaths, setMyLearningPaths] = useState<LearningPath[]>([]);
+  const [myLearningModules, setMyLearningModules] = useState<LearningModule[]>(
+    [],
+  );
+  const [loadingWorkshops, setLoadingWorkshops] = useState(false);
+  const [workshopGenerateForm, setWorkshopGenerateForm] =
+    useState<WorkshopGenerateFormState>(INITIAL_WORKSHOP_GENERATE_FORM);
+  const [workshopCandidateId, setWorkshopCandidateId] = useState('');
+  const [workshopPlatformFilter, setWorkshopPlatformFilter] =
+    useState<'ALL' | MeetingPlatformType>('ALL');
+  const [workshopCourseFilter, setWorkshopCourseFilter] = useState('ALL');
+  const [workshopFeedback, setWorkshopFeedback] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+
+  const userRoles = useMemo(() => {
+    const fromSingleRole =
+      typeof user.role === 'string' && user.role.trim() !== ''
+        ? [user.role]
+        : [];
+    const rawRoles = user.roles;
+    const fromRolesArray = Array.isArray(rawRoles)
+      ? rawRoles.filter((role) => typeof role === 'string' && role.trim() !== '')
+      : [];
+
+    const combined = [...fromSingleRole, ...fromRolesArray].map((role) =>
+      role.toUpperCase(),
+    );
+
+    return Array.from(new Set(combined));
+  }, [user.role, user.roles]);
+
+  const canManageAcademyCourses = useMemo(
+    () =>
+      userRoles.includes('COMPANY') ||
+      userRoles.includes('ADMIN') ||
+      userRoles.includes('RECRUITER'),
+    [userRoles],
+  );
+
+  const canUseTalentWorkshops = useMemo(
+    () => userRoles.includes('TALENT'),
+    [userRoles],
+  );
+
+  const canMonitorCandidateWorkshops = useMemo(
+    () =>
+      userRoles.includes('COMPANY') ||
+      userRoles.includes('ADMIN') ||
+      userRoles.includes('RECRUITER'),
+    [userRoles],
+  );
 
   const selectedVacancy = useMemo(
     () => myVacancies.find((vacancy) => vacancy.id === selectedVacancyId),
     [myVacancies, selectedVacancyId],
   );
 
+  const parseMultilineToArray = (text: string): string[] =>
+    text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => Boolean(line));
+
   const requestPayload = useMemo<CreateVacancyPayload>(() => ({
     title: requestForm.title.trim(),
+    area: requestForm.area.trim() || undefined,
     modality: requestForm.modality,
     location: requestForm.location.trim(),
+    contractType: requestForm.contractType,
+    seniority: requestForm.seniority,
+    salaryMin: requestForm.salaryMin ? Number(requestForm.salaryMin) : undefined,
+    salaryMax: requestForm.salaryMax ? Number(requestForm.salaryMax) : undefined,
     description: requestForm.description.trim(),
+    responsibilities: parseMultilineToArray(requestForm.responsibilitiesText),
     requiredSkills: requestForm.requiredSkills,
+    optionalSkills: parseMultilineToArray(requestForm.optionalSkillsText),
     vacancies: requestForm.vacancies,
   }), [requestForm]);
+
+  const clearVacancySelectionState = (options?: {
+    resetForm?: boolean;
+    clearMessages?: boolean;
+  }) => {
+    const resetForm = options?.resetForm ?? false;
+    const clearMessages = options?.clearMessages ?? false;
+
+    setSelectedVacancyId('');
+    setVacancyPipeline(null);
+    setFeedbackDraftByCandidateId({});
+
+    if (resetForm) {
+      setRequestForm(INITIAL_REQUEST_FORM);
+      setSelectedExistingSkill('');
+      setNewSkillName('');
+    }
+
+    if (clearMessages) {
+      setPipelineFeedback(null);
+      setRequestFeedback(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedVacancyId) {
+      return;
+    }
+
+    const stillExists = myVacancies.some(
+      (vacancy) => vacancy.id === selectedVacancyId,
+    );
+
+    if (!stillExists) {
+      const timeoutId = window.setTimeout(() => {
+        setSelectedVacancyId('');
+        setVacancyPipeline(null);
+        setFeedbackDraftByCandidateId({});
+        setRequestForm(INITIAL_REQUEST_FORM);
+        setSelectedExistingSkill('');
+        setNewSkillName('');
+        setPipelineFeedback({
+          type: 'info',
+          message:
+            'La solicitud seleccionada ya no esta disponible. Se limpio el proceso y las skills seleccionadas.',
+        });
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
+    }
+  }, [myVacancies, selectedVacancyId]);
 
   const loadVacancyPipeline = async (vacancyId: string) => {
     if (!vacancyId) {
       setVacancyPipeline(null);
+      setFeedbackDraftByCandidateId({});
       return;
     }
 
@@ -303,15 +641,75 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     try {
       const pipeline = await getVacancyPipeline(vacancyId);
       setVacancyPipeline(pipeline);
+      const pipelineCandidates = [
+        ...(pipeline?.selected || []),
+        ...(pipeline?.finalists || []),
+        ...(pipeline?.accepted || []),
+      ];
+      const nextDrafts = pipelineCandidates.reduce<Record<string, string>>(
+        (acc, candidate) => {
+          acc[candidate.id] = candidate.feedback || '';
+          return acc;
+        },
+        {},
+      );
+      setFeedbackDraftByCandidateId(nextDrafts);
     } catch (error) {
       console.warn('No se pudo cargar el pipeline de la vacante', error);
       setVacancyPipeline(null);
+      setFeedbackDraftByCandidateId({});
       setPipelineFeedback({
         type: 'error',
         message: 'No fue posible cargar el pipeline de candidatos de esta vacante.',
       });
     } finally {
       setLoadingVacancyPipeline(false);
+    }
+  };
+
+  const saveCandidateFeedback = async (candidateId: string) => {
+    if (!selectedVacancyId) {
+      setPipelineFeedback({
+        type: 'info',
+        message: 'Selecciona primero una vacante para guardar feedback.',
+      });
+      return;
+    }
+
+    const feedback = (feedbackDraftByCandidateId[candidateId] || '').trim();
+    if (!feedback) {
+      setPipelineFeedback({
+        type: 'info',
+        message: 'Escribe el feedback antes de guardarlo.',
+      });
+      return;
+    }
+
+    setSavingFeedbackCandidateId(candidateId);
+    try {
+      await upsertCandidateFeedback(selectedVacancyId, candidateId, feedback);
+      await loadVacancyPipeline(selectedVacancyId);
+      setPipelineFeedback({
+        type: 'success',
+        message: 'Feedback guardado correctamente para el candidato.',
+      });
+    } catch (error) {
+      const errorMessage =
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as { response?: { data?: { message?: string | string[] } } }).response?.data?.message !== 'undefined'
+          ? (error as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
+          : 'No se pudo guardar el feedback del candidato.';
+
+      setPipelineFeedback({
+        type: 'error',
+        message: Array.isArray(errorMessage)
+          ? errorMessage.join(', ')
+          : errorMessage || 'No se pudo guardar el feedback del candidato.',
+      });
+    } finally {
+      setSavingFeedbackCandidateId(null);
     }
   };
 
@@ -342,6 +740,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       }
 
       await loadVacancyPipeline(selectedVacancyId);
+      await loadDashboardMetrics();
       setPipelineFeedback({
         type: 'success',
         message:
@@ -384,17 +783,380 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     setLoadingVacancies(true);
     try {
       const vacancies = await getMyVacancies();
-      setMyVacancies((previousVacancies) => {
-        if (selectedVacancyId && vacancies.length === 0 && previousVacancies.length > 0) {
-          return previousVacancies;
-        }
-
-        return vacancies;
-      });
+      setMyVacancies(vacancies);
     } catch (error) {
       console.warn('No se pudieron cargar vacantes creadas', error);
     } finally {
       setLoadingVacancies(false);
+    }
+  };
+
+  const loadAcademyCourses = async () => {
+    setLoadingAcademyCourses(true);
+    setAcademyFeedback(null);
+    try {
+      const isAdminWithoutCompany =
+        userRoles.includes('ADMIN') && !userRoles.includes('COMPANY');
+      const courses = isAdminWithoutCompany
+        ? await listCourses({ published: courseFilters.published })
+        : await listMyCompanyCourses({ published: courseFilters.published });
+
+      setAcademyCourses(courses);
+      if (courses.length === 0) {
+        setExpandedCourseId(null);
+        return;
+      }
+
+      if (!expandedCourseId || !courses.some((course) => course.id === expandedCourseId)) {
+        setExpandedCourseId(courses[0].id);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudieron cargar los cursos de la academia.';
+      setAcademyFeedback({ type: 'error', message });
+      setAcademyCourses([]);
+      setExpandedCourseId(null);
+    } finally {
+      setLoadingAcademyCourses(false);
+    }
+  };
+
+  const loadWorkshops = async () => {
+    setLoadingWorkshops(true);
+    setWorkshopFeedback(null);
+
+    if (!canUseTalentWorkshops) {
+      setMyLearningPaths([]);
+      setMyLearningModules([]);
+      setLoadingWorkshops(false);
+      return;
+    }
+
+    try {
+      const [paths, modules] = await Promise.all([
+        getMyLearningPaths(),
+        getMyLearningModules(),
+      ]);
+      setMyLearningPaths(paths);
+      setMyLearningModules(modules);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudieron cargar los talleres.';
+      setWorkshopFeedback({ type: 'error', message });
+      setMyLearningPaths([]);
+      setMyLearningModules([]);
+    } finally {
+      setLoadingWorkshops(false);
+    }
+  };
+
+  const submitNewCourse = async () => {
+    if (!courseForm.title.trim()) {
+      setAcademyFeedback({
+        type: 'info',
+        message: 'Ingresa un titulo para crear el curso.',
+      });
+      return;
+    }
+
+    setSavingCourseAction(true);
+    setAcademyFeedback(null);
+    try {
+      const payload: CreateCourseDto = {
+        title: courseForm.title.trim(),
+        description: courseForm.description.trim() || undefined,
+        status: courseForm.status,
+      };
+
+      await createCourse(payload);
+      setCourseForm(INITIAL_COURSE_FORM);
+      await loadAcademyCourses();
+      setAcademyFeedback({
+        type: 'success',
+        message: 'Curso creado correctamente.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo crear el curso.';
+      setAcademyFeedback({ type: 'error', message });
+    } finally {
+      setSavingCourseAction(false);
+    }
+  };
+
+  const submitCourseModule = async () => {
+    if (!courseModuleForm.courseId) {
+      setAcademyFeedback({
+        type: 'info',
+        message: 'Selecciona un curso para agregar el modulo.',
+      });
+      return;
+    }
+
+    if (!courseModuleForm.title.trim()) {
+      setAcademyFeedback({
+        type: 'info',
+        message: 'Ingresa el titulo del modulo.',
+      });
+      return;
+    }
+
+    setSavingCourseAction(true);
+    setAcademyFeedback(null);
+    try {
+      const payload: CreateCourseModuleDto = {
+        title: courseModuleForm.title.trim(),
+        description: courseModuleForm.description.trim() || undefined,
+        order: Number(courseModuleForm.order) || 1,
+        videoUrl: courseModuleForm.videoUrl.trim() || undefined,
+        documentationUrl: courseModuleForm.documentationUrl.trim() || undefined,
+        durationMin: courseModuleForm.durationMin
+          ? Number(courseModuleForm.durationMin)
+          : undefined,
+      };
+
+      await addCourseModule(courseModuleForm.courseId, payload);
+      setCourseModuleForm((prev) => ({
+        ...INITIAL_COURSE_MODULE_FORM,
+        courseId: prev.courseId,
+      }));
+      setExpandedCourseId(courseModuleForm.courseId);
+      await loadAcademyCourses();
+      setAcademyFeedback({
+        type: 'success',
+        message: 'Modulo agregado al curso.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo agregar el modulo.';
+      setAcademyFeedback({ type: 'error', message });
+    } finally {
+      setSavingCourseAction(false);
+    }
+  };
+
+  const submitMeetingLink = async () => {
+    if (!courseMeetingForm.courseId) {
+      setAcademyFeedback({
+        type: 'info',
+        message: 'Selecciona un curso para agregar el link de reunion.',
+      });
+      return;
+    }
+
+    if (!courseMeetingForm.url.trim()) {
+      setAcademyFeedback({
+        type: 'info',
+        message: 'Ingresa la URL del taller en vivo.',
+      });
+      return;
+    }
+
+    if (!courseMeetingForm.scheduledDate || !courseMeetingForm.scheduledTime) {
+      setAcademyFeedback({
+        type: 'info',
+        message: 'Selecciona la fecha y hora del taller.',
+      });
+      return;
+    }
+
+    const scheduledAtCandidate = new Date(
+      `${courseMeetingForm.scheduledDate}T${courseMeetingForm.scheduledTime}`,
+    );
+
+    if (Number.isNaN(scheduledAtCandidate.getTime())) {
+      setAcademyFeedback({
+        type: 'error',
+        message: 'La fecha y hora del taller no tienen un formato valido.',
+      });
+      return;
+    }
+
+    setSavingCourseAction(true);
+    setAcademyFeedback(null);
+    try {
+      const payload: AddMeetingLinkDto = {
+        url: courseMeetingForm.url.trim(),
+        platform: courseMeetingForm.platform,
+        scheduledAt: scheduledAtCandidate.toISOString(),
+        password: courseMeetingForm.password.trim() || undefined,
+        notes: courseMeetingForm.notes.trim() || undefined,
+      };
+
+      await addCourseMeetingLink(courseMeetingForm.courseId, payload);
+      setCourseMeetingForm((prev) => ({
+        ...INITIAL_COURSE_MEETING_FORM,
+        courseId: prev.courseId,
+      }));
+      setExpandedCourseId(courseMeetingForm.courseId);
+      await loadAcademyCourses();
+      setAcademyFeedback({
+        type: 'success',
+        message: 'Link de reunion agregado al curso.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo agregar el link.';
+      setAcademyFeedback({ type: 'error', message });
+    } finally {
+      setSavingCourseAction(false);
+    }
+  };
+
+  const changeCourseStatus = async (
+    courseId: string,
+    status: CourseStatusType,
+  ) => {
+    setSavingCourseAction(true);
+    setAcademyFeedback(null);
+    try {
+      await updateCourse(courseId, { status });
+      await loadAcademyCourses();
+      setAcademyFeedback({
+        type: 'success',
+        message: 'Estado del curso actualizado.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo actualizar el estado del curso.';
+      setAcademyFeedback({ type: 'error', message });
+    } finally {
+      setSavingCourseAction(false);
+    }
+  };
+
+  const publishCourseAsAdmin = async (courseId: string) => {
+    setSavingCourseAction(true);
+    setAcademyFeedback(null);
+    try {
+      await approveCourse(courseId);
+      await loadAcademyCourses();
+      setAcademyFeedback({
+        type: 'success',
+        message: 'Curso aprobado y publicado.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo aprobar el curso.';
+      setAcademyFeedback({ type: 'error', message });
+    } finally {
+      setSavingCourseAction(false);
+    }
+  };
+
+  const removeCourseByArchiving = async (courseId: string) => {
+    setSavingCourseAction(true);
+    setAcademyFeedback(null);
+    try {
+      await archiveCourse(courseId);
+      await loadAcademyCourses();
+      setAcademyFeedback({
+        type: 'success',
+        message: 'Curso archivado correctamente.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo archivar el curso.';
+      setAcademyFeedback({ type: 'error', message });
+    } finally {
+      setSavingCourseAction(false);
+    }
+  };
+
+  const removeModule = async (courseId: string, moduleId: string) => {
+    setSavingCourseAction(true);
+    setAcademyFeedback(null);
+    try {
+      await deleteCourseModule(courseId, moduleId);
+      await loadAcademyCourses();
+      setAcademyFeedback({
+        type: 'success',
+        message: 'Modulo eliminado del curso.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo eliminar el modulo.';
+      setAcademyFeedback({ type: 'error', message });
+    } finally {
+      setSavingCourseAction(false);
+    }
+  };
+
+  const removeMeetingLink = async (courseId: string, meetingLinkId: string) => {
+    setSavingCourseAction(true);
+    setAcademyFeedback(null);
+    try {
+      await deleteCourseMeetingLink(courseId, meetingLinkId);
+      await loadAcademyCourses();
+      setAcademyFeedback({
+        type: 'success',
+        message: 'Link eliminado del curso.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'No se pudo eliminar el link.';
+      setAcademyFeedback({ type: 'error', message });
+    } finally {
+      setSavingCourseAction(false);
+    }
+  };
+
+  const createOrRefreshLearningPath = async () => {
+    setLoadingWorkshops(true);
+    setWorkshopFeedback(null);
+    try {
+      await generateMyLearningPath({
+        title: workshopGenerateForm.title.trim() || undefined,
+        objective: workshopGenerateForm.objective.trim() || undefined,
+      });
+      setWorkshopGenerateForm(INITIAL_WORKSHOP_GENERATE_FORM);
+      await loadWorkshops();
+      setWorkshopFeedback({
+        type: 'success',
+        message: 'Talleres generados/actualizados para tu perfil.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo generar la ruta de talleres.';
+      setWorkshopFeedback({ type: 'error', message });
+    } finally {
+      setLoadingWorkshops(false);
+    }
+  };
+
+  const markWorkshopModuleAsCompleted = async (moduleId: string) => {
+    setLoadingWorkshops(true);
+    setWorkshopFeedback(null);
+    try {
+      await updateMyModuleProgress(moduleId, {
+        status: LearningModuleStatus.COMPLETED as ModuleStatus,
+        progress: 100,
+      });
+      await loadWorkshops();
+      setWorkshopFeedback({
+        type: 'success',
+        message: 'Taller marcado como completado.',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo actualizar el progreso del taller.';
+      setWorkshopFeedback({ type: 'error', message });
+    } finally {
+      setLoadingWorkshops(false);
     }
   };
 
@@ -523,10 +1285,8 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     try {
       await createVacancy(requestPayload);
       await loadMyCreatedVacancies();
-      setRequestForm(INITIAL_REQUEST_FORM);
-      setSelectedVacancyId('');
-      setSelectedExistingSkill('');
-      setNewSkillName('');
+      await loadDashboardMetrics();
+      clearVacancySelectionState({ resetForm: true });
       setRequestFeedback({ type: 'success', message: 'Vacante creada correctamente.' });
     } catch (error) {
       console.error('No se pudo crear la vacante', error);
@@ -540,6 +1300,39 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       const parsedMessage = Array.isArray(backendMessage)
         ? backendMessage.join(', ')
         : backendMessage;
+
+      const nonWhitelistedFields = Array.isArray(backendMessage)
+        ? backendMessage.filter(
+            (message): message is string =>
+              typeof message === 'string' && message.includes('should not exist'),
+          )
+        : [];
+
+      if (nonWhitelistedFields.length > 0) {
+        try {
+          const minimalPayload: CreateVacancyPayload = {
+            title: requestPayload.title,
+            description: requestPayload.description,
+            requiredSkills: requestPayload.requiredSkills,
+            location: requestPayload.location,
+            modality: requestPayload.modality,
+            vacancies: requestPayload.vacancies,
+          };
+
+          await createVacancy(minimalPayload);
+          await loadMyCreatedVacancies();
+          await loadDashboardMetrics();
+          clearVacancySelectionState({ resetForm: true });
+          setRequestFeedback({
+            type: 'info',
+            message:
+              'La solicitud se creo en modo compatible. Tu backend aun no soporta area, seniority, salario, responsabilidades, optionalSkills y contractType.',
+          });
+          return;
+        } catch (fallbackError) {
+          console.error('Tambien fallo la creacion minima de vacante', fallbackError);
+        }
+      }
 
       setRequestFeedback({
         type: 'error',
@@ -574,6 +1367,118 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     () => candidates.find((candidate: CandidateProfile) => candidate.id === selectedCandidateId) ?? null,
     [selectedCandidateId, candidates]
   );
+
+  const selectedWorkshopCandidate = useMemo(
+    () =>
+      candidates.find((candidate) => candidate.id === workshopCandidateId) ?? null,
+    [candidates, workshopCandidateId],
+  );
+
+  const scheduledWorkshops = useMemo(
+    () =>
+      academyCourses.flatMap((course) =>
+        (course.meetingLinks || []).map((meetingLink) => ({
+          id: meetingLink.id,
+          url: meetingLink.url,
+          platform: meetingLink.platform,
+          notes: meetingLink.notes,
+          scheduledAt: meetingLink.scheduledAt,
+          createdAt: meetingLink.createdAt,
+          courseId: course.id,
+          courseTitle: course.title,
+          courseStatus: course.status,
+        })),
+      ),
+    [academyCourses],
+  );
+
+  const filteredScheduledWorkshops = useMemo(
+    () =>
+      scheduledWorkshops.filter((workshop) => {
+        const matchesPlatform =
+          workshopPlatformFilter === 'ALL' ||
+          workshop.platform === workshopPlatformFilter;
+        const matchesCourse =
+          workshopCourseFilter === 'ALL' || workshop.courseId === workshopCourseFilter;
+
+        return matchesPlatform && matchesCourse;
+      }),
+    [scheduledWorkshops, workshopPlatformFilter, workshopCourseFilter],
+  );
+
+  const formatWorkshopDateTime = (isoDate?: string | null): string => {
+    if (!isoDate) return 'Fecha no disponible';
+
+    const date = new Date(isoDate);
+    if (Number.isNaN(date.getTime())) return 'Fecha no disponible';
+
+    return date.toLocaleString('es-CO', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getWorkshopVisualState = (courseStatus: CourseStatusType) => {
+    if (courseStatus === CourseStatus.ARCHIVED) {
+      return {
+        label: 'Finalizado',
+        color: '#9D174D',
+        background: '#FCE7F3',
+      };
+    }
+
+    return {
+      label: 'Activo',
+      color: '#1D7A3D',
+      background: '#DCFCE7',
+    };
+  };
+
+  const openWorkshopRoom = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const copyWorkshopRoomLink = async (url: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const tempInput = document.createElement('input');
+        tempInput.value = url;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+      }
+
+      setWorkshopFeedback({
+        type: 'success',
+        message: 'Enlace del taller copiado. Ya puedes compartirlo.',
+      });
+    } catch {
+      setWorkshopFeedback({
+        type: 'error',
+        message: 'No se pudo copiar el enlace del taller.',
+      });
+    }
+  };
+
+  const shareWorkshopByWhatsApp = (courseTitle: string, url: string) => {
+    const message = `Te comparto el taller "${courseTitle}": ${url}`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const shareWorkshopByEmail = (courseTitle: string, url: string) => {
+    const subject = encodeURIComponent(`Invitacion al taller: ${courseTitle}`);
+    const body = encodeURIComponent(
+      `Hola,\n\nTe comparto el acceso al taller "${courseTitle}":\n${url}\n\nSaludos.`,
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
 
   const applyCandidateFilters = () => {
     setAppliedSearchByName(searchByName);
@@ -953,7 +1858,12 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
               <Typography sx={{ fontWeight: 800, color: '#1F3E69', mb: 1 }}>Cursos Actuales</Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {(currentCourses.length > 0
-                  ? currentCourses.map((course) => course.title || 'Curso sin titulo')
+                  ? currentCourses.map((course) => {
+                    const courseTitle = course.title || 'Curso sin titulo';
+                    const courseProgress =
+                      typeof course.progress === 'number' ? ` (${course.progress}%)` : '';
+                    return `${courseTitle}${courseProgress}`;
+                  })
                   : fallbackCurrentCourses
                 ).map((course) => (
                   <Button
@@ -1287,6 +2197,12 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       );
     }
 
+    const coursesFromApi = selectedCandidateDetails?.courses || [];
+    const completedCourses = coursesFromApi.filter(
+      (course) => course.status === 'completed',
+    );
+    const fallbackCompletedCourses = selectedCandidate.approvedCourses || [];
+
     return (
       <Paper sx={{ p: { xs: 3, md: 4 }, borderRadius: 3, boxShadow: '0px 3px 10px rgba(11,38,69,0.08)' }}>
         <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#1F3E69' }}>
@@ -1296,7 +2212,10 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
           Historial de cursos aprobados por el candidato seleccionado.
         </Typography>
         <Box sx={{ mt: 2, display: 'grid', gap: 1 }}>
-          {selectedCandidate.approvedCourses.map((course) => (
+          {(completedCourses.length > 0
+            ? completedCourses.map((course) => course.title || 'Curso sin titulo')
+            : fallbackCompletedCourses
+          ).map((course) => (
             <Box
               key={`${selectedCandidate.id}-course-approved-${course}`}
               sx={{ p: 1.2, border: '1px solid #D8E3F0', borderRadius: 1.6, bgcolor: '#F8FBFF' }}
@@ -1304,6 +2223,12 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
               <Typography sx={{ color: '#1F3E69', fontWeight: 700 }}>{course}</Typography>
             </Box>
           ))}
+
+          {completedCourses.length === 0 && fallbackCompletedCourses.length === 0 && (
+            <Typography sx={{ color: '#5C6F86', fontStyle: 'italic' }}>
+              Este candidato aun no tiene cursos aprobados.
+            </Typography>
+          )}
         </Box>
       </Paper>
     );
@@ -1332,12 +2257,13 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
           value={selectedVacancyId}
           onChange={(event) => {
             const vacancyId = event.target.value;
-            setSelectedVacancyId(vacancyId);
 
             if (!vacancyId) {
-              setRequestForm(INITIAL_REQUEST_FORM);
+              clearVacancySelectionState({ resetForm: true });
               return;
             }
+
+            setSelectedVacancyId(vacancyId);
 
             const selectedVacancy = myVacancies.find(
               (vacancy) => vacancy.id === vacancyId,
@@ -1347,10 +2273,28 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
             setRequestForm({
               ...INITIAL_REQUEST_FORM,
               title: selectedVacancy.title || '',
+              area: selectedVacancy.area || '',
               description: selectedVacancy.description || '',
               location: selectedVacancy.location || '',
               modality: normalizeModality(selectedVacancy.modality),
+              contractType:
+                (selectedVacancy.contractType as RecruiterRequestFormState['contractType']) ||
+                INITIAL_REQUEST_FORM.contractType,
+              seniority:
+                (selectedVacancy.seniority as RecruiterRequestFormState['seniority']) ||
+                INITIAL_REQUEST_FORM.seniority,
+              salaryMin:
+                typeof selectedVacancy.salaryMin === 'number'
+                  ? String(selectedVacancy.salaryMin)
+                  : '',
+              salaryMax:
+                typeof selectedVacancy.salaryMax === 'number'
+                  ? String(selectedVacancy.salaryMax)
+                  : '',
+              responsibilitiesText: (selectedVacancy.responsibilities || []).join('\n'),
               requiredSkills: selectedVacancy.requiredSkills || [],
+              optionalSkillsText: (selectedVacancy.optionalSkills || []).join('\n'),
+              vacancies: selectedVacancy.vacancies || INITIAL_REQUEST_FORM.vacancies,
             });
           }}
           helperText="Selecciona una vacante para cargar datos en el formulario"
@@ -1581,11 +2525,10 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
         <Button
           variant="outlined"
           onClick={() => {
-            setRequestForm(INITIAL_REQUEST_FORM);
-            setSelectedVacancyId('');
-            setSelectedExistingSkill('');
-            setNewSkillName('');
-            setRequestFeedback(null);
+            clearVacancySelectionState({
+              resetForm: true,
+              clearMessages: true,
+            });
           }}
           sx={{ textTransform: 'none', fontWeight: 700 }}
         >
@@ -1636,8 +2579,12 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
     candidate: VacancyPipelineCandidate,
     actionLabel: string,
     action: 'selected' | 'finalist' | 'accepted',
+    options?: { allowFeedback?: boolean },
   ) => {
     const isUpdating = updatingCandidateId === candidate.id;
+    const allowFeedback = Boolean(options?.allowFeedback);
+    const draftFeedback = feedbackDraftByCandidateId[candidate.id] ?? candidate.feedback ?? '';
+    const isSavingFeedback = savingFeedbackCandidateId === candidate.id;
 
     return (
       <Card key={`${action}-${candidate.id}`} sx={{ border: '1px solid #D8E3F0', borderRadius: 2 }}>
@@ -1692,6 +2639,39 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
               />
             ))}
           </Box>
+
+          {allowFeedback && (
+            <Box sx={{ mt: 1.4, display: 'grid', gap: 1 }}>
+              <Typography sx={{ color: '#173A68', fontWeight: 700, fontSize: '0.9rem' }}>
+                Feedback del reclutador
+              </Typography>
+              <TextField
+                placeholder="Escribe aquí el feedback para el talento..."
+                multiline
+                minRows={3}
+                fullWidth
+                value={draftFeedback}
+                onChange={(event) =>
+                  setFeedbackDraftByCandidateId((previous) => ({
+                    ...previous,
+                    [candidate.id]: event.target.value,
+                  }))
+                }
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    void saveCandidateFeedback(candidate.id);
+                  }}
+                  disabled={isSavingFeedback}
+                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                >
+                  {isSavingFeedback ? 'Guardando feedback...' : 'Guardar feedback'}
+                </Button>
+              </Box>
+            </Box>
+          )}
         </CardContent>
       </Card>
     );
@@ -1715,6 +2695,11 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
             ? `Vacante seleccionada: ${selectedVacancy.title}`
             : 'Selecciona una vacante en Mis Solicitudes para ver sus preseleccionados.'}
         </Typography>
+
+        <Alert severity="info" sx={{ mt: 1.4 }}>
+          El feedback del reclutador se habilita cuando el candidato pasa a
+          Seleccionados o Finalistas.
+        </Alert>
 
         {pipelineFeedback && (
           <Alert severity={pipelineFeedback.type} sx={{ mt: 1.4 }}>
@@ -1758,7 +2743,8 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
               )
             ) : (
               <Alert severity="info">
-                No hay candidatos con al menos una skill que coincida con la vacante seleccionada.
+                No hay candidatos preseleccionados para esta vacante. Verifica que
+                exista talento con skills que hagan match con los requerimientos.
               </Alert>
             )}
           </Box>
@@ -1768,6 +2754,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
           <Button
             variant="outlined"
             onClick={() => {
+              clearVacancySelectionState({ clearMessages: true });
               setSelectedMenuItem('Mis Solicitudes');
               void loadMyCreatedVacancies();
             }}
@@ -1816,6 +2803,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
               candidate,
               'Pasar a Finalista',
               'finalist',
+              { allowFeedback: true },
             ),
           )
         ) : (
@@ -1869,6 +2857,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
                 candidate,
                 'Reclutar',
                 'accepted',
+                { allowFeedback: true },
               ),
             )
           ) : (
@@ -1886,6 +2875,11 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
                 <CardContent>
                   <Typography sx={{ fontWeight: 800, color: '#1D7A3D' }}>{candidate.fullName}</Typography>
                   <Typography sx={{ color: '#3E6B52' }}>{candidate.title} · {candidate.location}</Typography>
+                  {candidate.feedback && (
+                    <Typography sx={{ mt: 1, color: '#2B4D3A', fontSize: '0.92rem' }}>
+                      Feedback: {candidate.feedback}
+                    </Typography>
+                  )}
                 </CardContent>
               </Card>
             ))
@@ -1894,6 +2888,560 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
           )}
         </Box>
       </Paper>
+    );
+  };
+
+  const renderAcademyCoursesSection = () => {
+    return (
+      <Box sx={{ display: 'grid', gap: 2 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+          <Typography sx={{ fontSize: { xs: '1.4rem', md: '1.8rem' }, fontWeight: 800, color: '#1F3E69' }}>
+            Academia Pro - Cursos
+          </Typography>
+          <Typography sx={{ mt: 0.8, color: '#5C6F86' }}>
+            Administra cursos de capacitacion para empresa y reclutamiento, con estado de publicacion, modulos y enlaces de talleres en vivo.
+          </Typography>
+          <Box sx={{ mt: 1.2, display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+            {userRoles.map((role) => (
+              <Chip key={`role-${role}`} label={`Rol: ${role}`} size="small" sx={{ bgcolor: '#E8F0FB', color: '#1D4678' }} />
+            ))}
+          </Box>
+        </Paper>
+
+        {academyFeedback && (
+          <Alert severity={academyFeedback.type === 'error' ? 'error' : academyFeedback.type === 'success' ? 'success' : 'info'}>
+            {academyFeedback.message}
+          </Alert>
+        )}
+
+        {!canManageAcademyCourses && (
+          <Alert severity="info">
+            Tu perfil no tiene permisos para gestionar cursos. Si tienes varios roles, inicia sesion con uno que incluya COMPANY, RECRUITER o ADMIN.
+          </Alert>
+        )}
+
+        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Typography sx={{ fontWeight: 800, color: '#1F3E69' }}>Listado de cursos</Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant={courseFilters.published ? 'outlined' : 'contained'}
+                onClick={() => setCourseFilters({ published: false })}
+                sx={{ textTransform: 'none' }}
+              >
+                Todos
+              </Button>
+              <Button
+                variant={courseFilters.published ? 'contained' : 'outlined'}
+                onClick={() => setCourseFilters({ published: true })}
+                sx={{ textTransform: 'none' }}
+              >
+                Publicados
+              </Button>
+              <Button onClick={() => void loadAcademyCourses()} sx={{ textTransform: 'none' }}>
+                Recargar
+              </Button>
+            </Box>
+          </Box>
+
+          {loadingAcademyCourses ? (
+            <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+              <CircularProgress />
+            </Box>
+          ) : academyCourses.length === 0 ? (
+            <Typography sx={{ mt: 2, color: '#5C6F86' }}>
+              No hay cursos registrados para este perfil.
+            </Typography>
+          ) : (
+            <Box sx={{ mt: 1.5, display: 'grid', gap: 1.1 }}>
+              {academyCourses.map((course) => {
+                const isExpanded = expandedCourseId === course.id;
+                const canApprove = userRoles.includes('ADMIN') && course.status === CourseStatus.PENDING_REVIEW;
+
+                return (
+                  <Paper key={course.id} sx={{ p: 1.5, borderRadius: 2, border: '1px solid #D8E3F0' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 800, color: '#173A68' }}>{course.title}</Typography>
+                        <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>
+                          {course.description || 'Sin descripcion'}
+                        </Typography>
+                        <Box sx={{ mt: 0.8, display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+                          <Chip size="small" label={`Estado: ${course.status}`} />
+                          <Chip size="small" label={`Modulos: ${course.modules?.length || 0}`} />
+                          <Chip size="small" label={`Talleres en vivo: ${course.meetingLinks?.length || 0}`} />
+                        </Box>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+                        <Button size="small" variant="outlined" onClick={() => setExpandedCourseId(isExpanded ? null : course.id)}>
+                          {isExpanded ? 'Ocultar' : 'Gestionar'}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => void changeCourseStatus(course.id, CourseStatus.PENDING_REVIEW)}
+                          disabled={savingCourseAction}
+                        >
+                          Enviar a revision
+                        </Button>
+                        {canApprove && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => void publishCourseAsAdmin(course.id)}
+                            disabled={savingCourseAction}
+                          >
+                            Publicar
+                          </Button>
+                        )}
+                        <Button
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                          onClick={() => void removeCourseByArchiving(course.id)}
+                          disabled={savingCourseAction}
+                        >
+                          Archivar
+                        </Button>
+                      </Box>
+                    </Box>
+
+                    {isExpanded && (
+                      <Box sx={{ mt: 1.2, display: 'grid', gap: 1.2 }}>
+                        <Divider />
+                        <Typography sx={{ fontWeight: 700, color: '#1F3E69' }}>Modulos</Typography>
+                        <Box sx={{ display: 'grid', gap: 0.8 }}>
+                          {(course.modules || []).map((module) => (
+                            <Paper key={module.id} sx={{ p: 1.1, borderRadius: 1.4, border: '1px solid #E4ECF6' }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                                <Typography sx={{ color: '#173A68', fontWeight: 700 }}>
+                                  #{module.order} {module.title}
+                                </Typography>
+                                <Button color="error" size="small" onClick={() => void removeModule(course.id, module.id)}>
+                                  Eliminar
+                                </Button>
+                              </Box>
+                              <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>{module.description || 'Sin descripcion'}</Typography>
+                            </Paper>
+                          ))}
+                          {(!course.modules || course.modules.length === 0) && (
+                            <Typography sx={{ color: '#5C6F86' }}>Este curso aun no tiene modulos.</Typography>
+                          )}
+                        </Box>
+
+                        <Typography sx={{ fontWeight: 700, color: '#1F3E69' }}>Links de talleres</Typography>
+                        <Box sx={{ display: 'grid', gap: 0.8 }}>
+                          {(course.meetingLinks || []).map((meetingLink) => (
+                            <Paper key={meetingLink.id} sx={{ p: 1.1, borderRadius: 1.4, border: '1px solid #E4ECF6' }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                                <Typography sx={{ color: '#173A68', fontWeight: 700 }}>
+                                  {meetingLink.platform}
+                                </Typography>
+                                <Button color="error" size="small" onClick={() => void removeMeetingLink(course.id, meetingLink.id)}>
+                                  Eliminar
+                                </Button>
+                              </Box>
+                              <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>{meetingLink.url}</Typography>
+                            </Paper>
+                          ))}
+                          {(!course.meetingLinks || course.meetingLinks.length === 0) && (
+                            <Typography sx={{ color: '#5C6F86' }}>Este curso aun no tiene enlaces de taller.</Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    )}
+                  </Paper>
+                );
+              })}
+            </Box>
+          )}
+        </Paper>
+
+        {canManageAcademyCourses && (
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}>
+            <Paper sx={{ p: 2, borderRadius: 3 }}>
+              <Typography sx={{ fontWeight: 800, color: '#1F3E69', mb: 1 }}>Nuevo curso</Typography>
+              <Box sx={{ display: 'grid', gap: 1 }}>
+                <TextField label="Titulo" size="small" value={courseForm.title} onChange={(event) => setCourseForm((prev) => ({ ...prev, title: event.target.value }))} />
+                <TextField label="Descripcion" size="small" multiline minRows={3} value={courseForm.description} onChange={(event) => setCourseForm((prev) => ({ ...prev, description: event.target.value }))} />
+                <TextField select label="Estado" size="small" value={courseForm.status} onChange={(event) => setCourseForm((prev) => ({ ...prev, status: event.target.value as CourseStatusType }))}>
+                  {Object.values(CourseStatus).map((status) => (
+                    <MenuItem key={`create-status-${status}`} value={status}>{status}</MenuItem>
+                  ))}
+                </TextField>
+                <Button variant="contained" onClick={() => void submitNewCourse()} disabled={savingCourseAction}>
+                  Crear curso
+                </Button>
+              </Box>
+            </Paper>
+
+            <Paper sx={{ p: 2, borderRadius: 3 }}>
+              <Typography sx={{ fontWeight: 800, color: '#1F3E69', mb: 1 }}>Agregar modulo</Typography>
+              <Box sx={{ display: 'grid', gap: 1 }}>
+                <TextField select label="Curso" size="small" value={courseModuleForm.courseId} onChange={(event) => setCourseModuleForm((prev) => ({ ...prev, courseId: event.target.value }))}>
+                  {academyCourses.map((course) => (
+                    <MenuItem key={`module-course-${course.id}`} value={course.id}>{course.title}</MenuItem>
+                  ))}
+                </TextField>
+                <TextField label="Titulo modulo" size="small" value={courseModuleForm.title} onChange={(event) => setCourseModuleForm((prev) => ({ ...prev, title: event.target.value }))} />
+                <TextField label="Descripcion" size="small" value={courseModuleForm.description} onChange={(event) => setCourseModuleForm((prev) => ({ ...prev, description: event.target.value }))} />
+                <TextField label="Orden" size="small" type="number" value={courseModuleForm.order} onChange={(event) => setCourseModuleForm((prev) => ({ ...prev, order: Number(event.target.value) || 1 }))} />
+                <TextField label="Video URL" size="small" value={courseModuleForm.videoUrl} onChange={(event) => setCourseModuleForm((prev) => ({ ...prev, videoUrl: event.target.value }))} />
+                <TextField label="Doc URL" size="small" value={courseModuleForm.documentationUrl} onChange={(event) => setCourseModuleForm((prev) => ({ ...prev, documentationUrl: event.target.value }))} />
+                <TextField label="Duracion (min)" size="small" type="number" value={courseModuleForm.durationMin} onChange={(event) => setCourseModuleForm((prev) => ({ ...prev, durationMin: event.target.value }))} />
+                <Button variant="contained" onClick={() => void submitCourseModule()} disabled={savingCourseAction}>
+                  Guardar modulo
+                </Button>
+              </Box>
+            </Paper>
+
+            <Paper sx={{ p: 2, borderRadius: 3 }}>
+              <Typography sx={{ fontWeight: 800, color: '#1F3E69', mb: 1 }}>Agregar taller en vivo</Typography>
+              <Box sx={{ display: 'grid', gap: 1 }}>
+                <TextField select label="Curso" size="small" value={courseMeetingForm.courseId} onChange={(event) => setCourseMeetingForm((prev) => ({ ...prev, courseId: event.target.value }))}>
+                  {academyCourses.map((course) => (
+                    <MenuItem key={`meeting-course-${course.id}`} value={course.id}>{course.title}</MenuItem>
+                  ))}
+                </TextField>
+                <TextField label="URL" size="small" value={courseMeetingForm.url} onChange={(event) => setCourseMeetingForm((prev) => ({ ...prev, url: event.target.value }))} />
+                <TextField
+                  label="Fecha del taller"
+                  size="small"
+                  type="date"
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  value={courseMeetingForm.scheduledDate}
+                  onChange={(event) =>
+                    setCourseMeetingForm((prev) => ({
+                      ...prev,
+                      scheduledDate: event.target.value,
+                    }))
+                  }
+                />
+                <TextField
+                  label="Hora del taller"
+                  size="small"
+                  type="time"
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                    htmlInput: { step: 300 },
+                  }}
+                  value={courseMeetingForm.scheduledTime}
+                  onChange={(event) =>
+                    setCourseMeetingForm((prev) => ({
+                      ...prev,
+                      scheduledTime: event.target.value,
+                    }))
+                  }
+                />
+                <TextField select label="Plataforma" size="small" value={courseMeetingForm.platform} onChange={(event) => setCourseMeetingForm((prev) => ({ ...prev, platform: event.target.value as MeetingPlatformType }))}>
+                  {Object.values(MeetingPlatform).map((platform) => (
+                    <MenuItem key={`meeting-platform-${platform}`} value={platform}>{platform}</MenuItem>
+                  ))}
+                </TextField>
+                <TextField label="Password (opcional)" size="small" value={courseMeetingForm.password} onChange={(event) => setCourseMeetingForm((prev) => ({ ...prev, password: event.target.value }))} />
+                <TextField label="Notas" size="small" value={courseMeetingForm.notes} onChange={(event) => setCourseMeetingForm((prev) => ({ ...prev, notes: event.target.value }))} />
+                <Button variant="contained" onClick={() => void submitMeetingLink()} disabled={savingCourseAction}>
+                  Guardar enlace
+                </Button>
+              </Box>
+            </Paper>
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
+  const renderWorkshopsSection = () => {
+    const candidateWorkshopData = selectedCandidateDetails?.learningPath;
+
+    return (
+      <Box sx={{ display: 'grid', gap: 2 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+          <Typography sx={{ fontSize: { xs: '1.4rem', md: '1.8rem' }, fontWeight: 800, color: '#1F3E69' }}>
+            Academia Pro - Talleres
+          </Typography>
+          <Typography sx={{ mt: 0.8, color: '#5C6F86' }}>
+            Gestiona talleres para talento y realiza seguimiento del avance desde perfiles de candidatos.
+          </Typography>
+        </Paper>
+
+        {workshopFeedback && (
+          <Alert severity={workshopFeedback.type === 'error' ? 'error' : workshopFeedback.type === 'success' ? 'success' : 'info'}>
+            {workshopFeedback.message}
+          </Alert>
+        )}
+
+        {canManageAcademyCourses && (
+          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography sx={{ fontWeight: 800, color: '#1F3E69' }}>
+                Talleres programados
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <TextField
+                  select
+                  size="small"
+                  label="Plataforma"
+                  value={workshopPlatformFilter}
+                  onChange={(event) =>
+                    setWorkshopPlatformFilter(
+                      event.target.value as 'ALL' | MeetingPlatformType,
+                    )
+                  }
+                  sx={{ minWidth: 160 }}
+                >
+                  <MenuItem value="ALL">Todas</MenuItem>
+                  {Object.values(MeetingPlatform).map((platform) => (
+                    <MenuItem key={`filter-platform-${platform}`} value={platform}>
+                      {platform}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  size="small"
+                  label="Curso"
+                  value={workshopCourseFilter}
+                  onChange={(event) => setWorkshopCourseFilter(event.target.value)}
+                  sx={{ minWidth: 220 }}
+                >
+                  <MenuItem value="ALL">Todos los cursos</MenuItem>
+                  {academyCourses.map((course) => (
+                    <MenuItem key={`filter-course-${course.id}`} value={course.id}>
+                      {course.title}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <Button variant="outlined" onClick={() => void loadAcademyCourses()} sx={{ textTransform: 'none' }}>
+                  Recargar talleres
+                </Button>
+              </Box>
+            </Box>
+
+            {loadingAcademyCourses ? (
+              <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : filteredScheduledWorkshops.length === 0 ? (
+              <Alert severity="info" sx={{ mt: 1.2 }}>
+                No hay talleres para esos filtros. Agrega enlaces en Cursos - Agregar taller en vivo o cambia los filtros.
+              </Alert>
+            ) : (
+              <Box sx={{ mt: 1.2, display: 'grid', gap: 1 }}>
+                {filteredScheduledWorkshops.map((workshop) => {
+                  const workshopState = getWorkshopVisualState(workshop.courseStatus);
+
+                  return (
+                    <Paper key={`scheduled-workshop-${workshop.id}`} sx={{ p: 1.3, borderRadius: 2, border: '1px solid #D8E3F0' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
+                        <Box>
+                          <Typography sx={{ fontWeight: 800, color: '#173A68' }}>
+                            {workshop.courseTitle}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', mt: 0.5 }}>
+                            <Chip size="small" label={`Plataforma: ${workshop.platform}`} />
+                            <Chip
+                              size="small"
+                              label={workshopState.label}
+                              sx={{ bgcolor: workshopState.background, color: workshopState.color, fontWeight: 700 }}
+                            />
+                            <Chip
+                              size="small"
+                              label={`Programado: ${formatWorkshopDateTime(workshop.scheduledAt)}`}
+                            />
+                          </Box>
+                          <Typography sx={{ color: '#304965', fontSize: '0.9rem', mt: 0.4 }}>
+                            {workshop.url}
+                          </Typography>
+                          {workshop.notes && (
+                            <Typography sx={{ color: '#5C6F86', fontSize: '0.85rem', mt: 0.4 }}>
+                              Notas: {workshop.notes}
+                            </Typography>
+                          )}
+                        </Box>
+
+                        <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+                          <Button
+                            variant="contained"
+                            onClick={() => openWorkshopRoom(workshop.url)}
+                            sx={{ textTransform: 'none', bgcolor: '#173A68', '&:hover': { bgcolor: '#112D51' } }}
+                          >
+                            Entrar a sala
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            onClick={() => void copyWorkshopRoomLink(workshop.url)}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Copiar enlace
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            onClick={() => shareWorkshopByWhatsApp(workshop.courseTitle, workshop.url)}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Compartir WhatsApp
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            onClick={() => shareWorkshopByEmail(workshop.courseTitle, workshop.url)}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Compartir correo
+                          </Button>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Box>
+            )}
+          </Paper>
+        )}
+
+        {canUseTalentWorkshops && (
+          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+            <Typography sx={{ fontWeight: 800, color: '#1F3E69', mb: 1 }}>
+              Talleres de mi perfil (rol TALENT)
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.2fr 1fr 1fr' }, gap: 1 }}>
+              <TextField label="Titulo de ruta (opcional)" size="small" value={workshopGenerateForm.title} onChange={(event) => setWorkshopGenerateForm((prev) => ({ ...prev, title: event.target.value }))} />
+              <TextField label="Objetivo (opcional)" size="small" value={workshopGenerateForm.objective} onChange={(event) => setWorkshopGenerateForm((prev) => ({ ...prev, objective: event.target.value }))} />
+              <Button variant="contained" onClick={() => void createOrRefreshLearningPath()} disabled={loadingWorkshops}>
+                Generar / Actualizar
+              </Button>
+            </Box>
+
+            {loadingWorkshops ? (
+              <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}>
+                <CircularProgress size={26} />
+              </Box>
+            ) : (
+              <Box sx={{ mt: 1.2, display: 'grid', gap: 1 }}>
+                {myLearningPaths.map((path) => (
+                  <Paper key={path.id} sx={{ p: 1.4, borderRadius: 2, border: '1px solid #D8E3F0' }}>
+                    <Typography sx={{ fontWeight: 800, color: '#173A68' }}>{path.title}</Typography>
+                    <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>{path.objective || 'Sin objetivo definido'}</Typography>
+                    {typeof path.confidence === 'number' && (
+                      <Typography sx={{ color: '#1D4678', fontSize: '0.85rem', mt: 0.4 }}>
+                        Match IA: {path.confidence}%
+                      </Typography>
+                    )}
+                  </Paper>
+                ))}
+
+                {myLearningModules.map((module) => {
+                  const progress = module.progress?.[0];
+                  const status = progress?.status || 'PENDING';
+                  const progressPct = progress?.progress ?? 0;
+
+                  return (
+                    <Paper key={module.id} sx={{ p: 1.4, borderRadius: 2, border: '1px solid #E4ECF6' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Box>
+                          <Typography sx={{ fontWeight: 700, color: '#173A68' }}>#{module.order} {module.title}</Typography>
+                          <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>{module.description || 'Sin descripcion'}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                          <Chip size="small" label={`${status} - ${progressPct}%`} />
+                          <Button size="small" variant="outlined" onClick={() => void markWorkshopModuleAsCompleted(module.id)}>
+                            Completar
+                          </Button>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+
+                {myLearningPaths.length === 0 && myLearningModules.length === 0 && (
+                  <Typography sx={{ color: '#5C6F86' }}>
+                    Todavia no tienes talleres asignados para tu perfil.
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Paper>
+        )}
+
+        {canMonitorCandidateWorkshops && (
+          <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+            <Typography sx={{ fontWeight: 800, color: '#1F3E69', mb: 1 }}>
+              Seguimiento de talleres por candidato
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+              <TextField
+                select
+                size="small"
+                label="Candidato"
+                value={workshopCandidateId}
+                onChange={(event) => setWorkshopCandidateId(event.target.value)}
+                sx={{ minWidth: { xs: '100%', md: 360 } }}
+              >
+                {candidates.map((candidate) => (
+                  <MenuItem key={`candidate-workshop-${candidate.id}`} value={candidate.id}>
+                    {candidate.fullName} - {candidate.title}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  if (!workshopCandidateId) {
+                    setWorkshopFeedback({
+                      type: 'info',
+                      message: 'Selecciona un candidato para ver su ruta de talleres.',
+                    });
+                    return;
+                  }
+                  void loadCandidateDetails(workshopCandidateId);
+                }}
+              >
+                Ver talleres
+              </Button>
+            </Box>
+
+            {selectedWorkshopCandidate && (
+              <Box sx={{ mt: 1.5 }}>
+                <Typography sx={{ fontWeight: 700, color: '#173A68' }}>
+                  {selectedWorkshopCandidate.fullName}
+                </Typography>
+                <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>
+                  {selectedWorkshopCandidate.title} · {selectedWorkshopCandidate.location}
+                </Typography>
+              </Box>
+            )}
+
+            {loadingCandidateDetails ? (
+              <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : candidateWorkshopData ? (
+              <Paper sx={{ mt: 1.5, p: 1.5, borderRadius: 2, border: '1px solid #D8E3F0' }}>
+                <Typography sx={{ fontWeight: 800, color: '#1F3E69' }}>
+                  Ruta de aprendizaje detectada
+                </Typography>
+                <Typography sx={{ color: '#304965', mt: 0.7 }}>
+                  Estado: {candidateWorkshopData.status || 'N/A'}
+                </Typography>
+                <Typography sx={{ color: '#304965' }}>
+                  Avance estimado: {candidateWorkshopData.progress ?? 0}%
+                </Typography>
+                {candidateWorkshopData.title && (
+                  <Typography sx={{ color: '#304965' }}>
+                    Ruta: {candidateWorkshopData.title}
+                  </Typography>
+                )}
+              </Paper>
+            ) : (
+              <Typography sx={{ mt: 1.5, color: '#5C6F86' }}>
+                Selecciona un candidato para consultar su informacion de talleres.
+              </Typography>
+            )}
+          </Paper>
+        )}
+      </Box>
     );
   };
 
@@ -1944,6 +3492,20 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
           await loadVacancyPipeline(vacancyIdForPipeline);
         }
       }
+    }
+
+    if (item === 'Cursos') {
+      await loadAcademyCourses();
+    }
+
+    if (item === 'Talleres') {
+      if (canManageAcademyCourses) {
+        await loadAcademyCourses();
+      }
+      if (canMonitorCandidateWorkshops) {
+        await loadCandidates();
+      }
+      await loadWorkshops();
     }
   };
 
@@ -2054,20 +3616,22 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Box
           sx={{
-            height: 58,
+            minHeight: 58,
             bgcolor: '#F8FBFF',
             borderBottom: '1px solid #D7E1EC',
             px: { xs: 2, md: 4 },
+            py: { xs: 1.2, md: 0 },
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: 1.5,
+            flexWrap: { xs: 'wrap', md: 'nowrap' },
           }}
         >
-          <Typography sx={{ fontWeight: 700, color: '#1F3557' }}>
+          <Typography sx={{ fontWeight: 700, color: '#1F3557', fontSize: { xs: '0.95rem', md: '1rem' } }}>
             Dashboard Reclutador: {user?.name || 'Empresa'}
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'flex-end', md: 'flex-start' } }}>
             <Typography sx={{ fontWeight: 700, color: '#1F3557' }}>Hola, Recruiter</Typography>
             <Avatar sx={{ width: 34, height: 34, bgcolor: '#E5741F', color: '#fff', fontWeight: 700 }}>
               R
@@ -2076,6 +3640,33 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
         </Box>
 
         <Box sx={{ p: { xs: 2, md: 4 } }}>
+          <Box sx={{ display: { xs: 'flex', md: 'none' }, gap: 1, overflowX: 'auto', pb: 1.2, mb: 1.2 }}>
+            {sidebarSections.flatMap((section) =>
+              section.items.map((item) => (
+                <Button
+                  key={`mobile-company-${item}`}
+                  size="small"
+                  variant={selectedMenuItem === item ? 'contained' : 'outlined'}
+                  onClick={() => {
+                    void handleMenuSelection(item);
+                  }}
+                  sx={{
+                    whiteSpace: 'nowrap',
+                    textTransform: 'none',
+                    borderColor: '#173A68',
+                    color: selectedMenuItem === item ? '#fff' : '#173A68',
+                    bgcolor: selectedMenuItem === item ? '#173A68' : 'transparent',
+                    '&:hover': {
+                      bgcolor: selectedMenuItem === item ? '#112D51' : 'rgba(23,58,104,0.08)',
+                    },
+                  }}
+                >
+                  {item}
+                </Button>
+              )),
+            )}
+          </Box>
+
           {selectedMenuItem === null ? (
             <>
               <Paper
@@ -2100,8 +3691,12 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
                   <Card sx={{ borderRadius: 2.5, textAlign: 'center', p: 0.5, minHeight: 150, width: '100%', display: 'flex' }}>
                     <CardContent sx={{ width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <Typography variant="body2" color="text.secondary">Vacantes Activas</Typography>
-                      <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>8</Typography>
-                      <Typography sx={{ mt: 1, fontWeight: 800, color: '#E5741F' }}>EN PROGRESO</Typography>
+                      <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>
+                        {dashboardMetrics.openVacancies}
+                      </Typography>
+                      <Typography sx={{ mt: 1, fontWeight: 800, color: '#E5741F' }}>
+                        {loadingDashboardMetrics ? 'ACTUALIZANDO...' : 'NO FINALIZADAS'}
+                      </Typography>
                     </CardContent>
                   </Card>
                 </Box>
@@ -2109,10 +3704,14 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
                 <Box sx={{ flex: '1 1 220px', display: 'flex' }}>
                   <Card sx={{ borderRadius: 2.5, textAlign: 'center', p: 0.5, minHeight: 150, width: '100%', display: 'flex' }}>
                     <CardContent sx={{ width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <Typography variant="body2" color="text.secondary">Candidatos Totales</Typography>
-                      <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>{candidates.length}</Typography>
+                      <Typography variant="body2" color="text.secondary">Candidatos Disponibles</Typography>
+                      <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>
+                        {dashboardMetrics.availableCandidates}
+                      </Typography>
                       <Typography sx={{ mt: 1, fontWeight: 800, color: '#2EA35A' }}>
-                        {loadingCandidates ? 'ACTUALIZANDO...' : 'DISPONIBLES'}
+                        {loadingDashboardMetrics
+                          ? 'ACTUALIZANDO...'
+                          : `P:${dashboardMetrics.preselectedCandidates} | S:${dashboardMetrics.selectedCandidates} | F:${dashboardMetrics.finalistCandidates}`}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -2122,8 +3721,12 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
                   <Card sx={{ borderRadius: 2.5, textAlign: 'center', p: 0.5, minHeight: 150, width: '100%', display: 'flex' }}>
                     <CardContent sx={{ width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <Typography variant="body2" color="text.secondary">Procesos Finalizados</Typography>
-                      <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>12</Typography>
-                      <Typography sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>ESTE MES</Typography>
+                      <Typography variant="h4" sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>
+                        {dashboardMetrics.finishedRecruitmentProcesses}
+                      </Typography>
+                      <Typography sx={{ mt: 1, fontWeight: 800, color: '#1F3E69' }}>
+                        {loadingDashboardMetrics ? 'ACTUALIZANDO...' : 'CON CANDIDATO ACEPTADO'}
+                      </Typography>
                     </CardContent>
                   </Card>
                 </Box>
@@ -2185,6 +3788,10 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
             renderSelectedCandidatesSection()
           ) : selectedMenuItem === 'Finalistas' ? (
             renderFinalistsSection()
+          ) : selectedMenuItem === 'Cursos' ? (
+            renderAcademyCoursesSection()
+          ) : selectedMenuItem === 'Talleres' ? (
+            renderWorkshopsSection()
           ) : (
             <Paper
               sx={{

@@ -2,6 +2,7 @@ export const UserRole = {
   TALENT: 'TALENT',
   COMPANY: 'COMPANY',
   ADMIN: 'ADMIN',
+  RECRUITER: 'RECRUITER',
 } as const;
 
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
@@ -11,7 +12,13 @@ export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;
+  linkedinConnected?: boolean;
+  roles?: UserRole[];
   [key: string]: unknown;
+}
+
+export interface AuthConnections {
+  linkedinConnected: boolean;
 }
 
 export interface RegisterDto {

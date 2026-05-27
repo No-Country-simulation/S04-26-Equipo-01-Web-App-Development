@@ -1,4 +1,4 @@
-import api from '../feactures/api/axiosInterface';
+import api from '../features/api/axiosInterface';
 import { throwBackendError } from './api-error';
 import type {
   CreateUserSkillDto,

@@ -151,3 +151,15 @@ export interface AnalyzeCvFileDto {
   applyToProfile?: boolean;
   extractedText?: string;
 }
+
+export interface ImportLinkedInCvDto {
+  linkedinUrl?: string;
+  extractedText?: string;
+}
+
+export interface LinkedInCvImportResponse {
+  sourceUrl: string;
+  extractedText: string;
+  extractedTextLength: number;
+  summary?: string;
+}

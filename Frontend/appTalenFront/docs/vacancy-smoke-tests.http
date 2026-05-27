@@ -1,0 +1,61 @@
+@api = http://localhost:3000
+@token = REEMPLAZAR_JWT
+
+### 1) Crear vacante con todos los campos relevantes
+POST {{api}}/recruiter/vacancies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Desarrollador Full Stack",
+  "area": "Ingenieria",
+  "modality": "hybrid",
+  "location": "Bogota",
+  "contractType": "full-time",
+  "seniority": "mid",
+  "vacancies": 2,
+  "salaryMin": 3500,
+  "salaryMax": 5000,
+  "description": "Desarrollo y mantenimiento de aplicaciones web para productos internos.",
+  "responsibilities": [
+    "Desarrollar nuevas features",
+    "Corregir bugs criticos"
+  ],
+  "requiredSkills": [
+    "React",
+    "Node.js"
+  ],
+  "optionalSkills": [
+    "Docker",
+    "AWS"
+  ]
+}
+
+### 2) Listar mis vacantes y validar persistencia de campos
+GET {{api}}/recruiter/vacancies
+Authorization: Bearer {{token}}
+
+### 3) (Opcional) Validacion negativa: salaryMax < salaryMin
+POST {{api}}/recruiter/vacancies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "QA Engineer",
+  "area": "Calidad",
+  "modality": "remote",
+  "location": "Medellin",
+  "contractType": "full-time",
+  "seniority": "mid",
+  "vacancies": 1,
+  "salaryMin": 6000,
+  "salaryMax": 3000,
+  "description": "Pruebas funcionales y automatizadas.",
+  "responsibilities": ["Ejecutar pruebas"],
+  "requiredSkills": ["Testing"],
+  "optionalSkills": ["Playwright"]
+}
+
+### Esperado:
+### - Backend responde 400/422 si aplica validacion salaryMax >= salaryMin.
+### - Si backend no valida aun, registrar pendiente tecnico.

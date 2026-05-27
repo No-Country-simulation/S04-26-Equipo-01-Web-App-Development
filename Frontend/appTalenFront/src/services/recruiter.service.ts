@@ -1,4 +1,4 @@
-import api from '../feactures/api/axiosInterface';
+import api from '../features/api/axiosInterface';
 
 export interface CandidateProfile {
   id: string;
@@ -172,8 +172,15 @@ export interface RecruiterVacancy {
   id: string;
   companyId: string;
   title: string;
+  area?: string;
   description: string;
   requiredSkills: string[];
+  optionalSkills?: string[];
+  responsibilities?: string[];
+  contractType?: string;
+  seniority?: string;
+  salaryMin?: number;
+  salaryMax?: number;
   location?: string;
   modality?: string;
   vacancies?: number;
@@ -182,8 +189,15 @@ export interface RecruiterVacancy {
 
 export interface CreateVacancyPayload {
   title: string;
+  area?: string;
   description: string;
   requiredSkills: string[];
+  optionalSkills?: string[];
+  responsibilities?: string[];
+  contractType?: 'full-time' | 'part-time' | 'contractor' | 'internship' | string;
+  seniority?: 'junior' | 'mid' | 'senior' | 'lead' | string;
+  salaryMin?: number;
+  salaryMax?: number;
   location?: string;
   modality?: string;
   vacancies?: number;
@@ -197,6 +211,7 @@ export interface VacancyPipelineCandidate {
   skillsValidated: string[];
   matchedSkills: string[];
   matchCount: number;
+  feedback?: string | null;
 }
 
 export interface VacancyPipeline {
@@ -213,6 +228,15 @@ export interface RecruiterSkillOption {
   id: string;
   name: string;
   category: string;
+}
+
+export interface TalentRecruiterFeedback {
+  applicationId: string;
+  vacancyId: string;
+  vacancyTitle: string;
+  stage: 'CONTACTED' | 'FINALIST' | 'HIRED' | string;
+  feedback: string;
+  createdAt: string;
 }
 
 export interface CreateRecruiterSkillPayload {
@@ -460,6 +484,28 @@ export const acceptFinalistCandidate = async (
   return response.data;
 };
 
+export const upsertCandidateFeedback = async (
+  vacancyId: string,
+  candidateId: string,
+  feedback: string,
+) => {
+  const response = await api.put(
+    `/recruiter/vacancies/${vacancyId}/candidates/${candidateId}/feedback`,
+    { feedback },
+  );
+  return response.data;
+};
+
+export const getMyRecruiterFeedback = async (): Promise<TalentRecruiterFeedback[]> => {
+  try {
+    const response = await api.get<TalentRecruiterFeedback[]>('/marketplace/me/feedback');
+    return response.data || [];
+  } catch (error: unknown) {
+    console.warn('Talent feedback endpoint not available', error);
+    return [];
+  }
+};
+
 /**
  * Crea una nueva solicitud de reclutamiento.
  * Prueba endpoints alternativos para compatibilidad entre ambientes.
@@ -469,8 +515,15 @@ export const createRecruiterRequest = async (
 ) => {
   const vacancyPayload: CreateVacancyPayload = {
     title: payload.title,
+    area: payload.area,
     description: payload.description,
     requiredSkills: payload.requiredSkills,
+    optionalSkills: payload.optionalSkills,
+    responsibilities: payload.responsibilities,
+    contractType: payload.contractType,
+    seniority: payload.seniority,
+    salaryMin: payload.salaryMin,
+    salaryMax: payload.salaryMax,
     location: payload.location,
     modality: payload.modality,
     vacancies: payload.vacancies,
@@ -508,7 +561,57 @@ export const createVacancy = async (
   payload: CreateVacancyPayload,
 ): Promise<RecruiterVacancy> => {
   const response = await api.post<RecruiterVacancy>('/recruiter/vacancies', payload);
-  return response.data;
+  const rawVacancy = response.data as unknown as Record<string, unknown>;
+
+  return {
+    id: String(rawVacancy.id || rawVacancy._id || ''),
+    companyId: String(rawVacancy.companyId || rawVacancy.company_id || ''),
+    title: String(rawVacancy.title || ''),
+    area: typeof rawVacancy.area === 'string' ? rawVacancy.area : undefined,
+    description: String(rawVacancy.description || ''),
+    requiredSkills: Array.isArray(rawVacancy.requiredSkills)
+      ? rawVacancy.requiredSkills.filter((skill): skill is string => typeof skill === 'string')
+      : Array.isArray(rawVacancy.required_skills)
+        ? (rawVacancy.required_skills as unknown[]).filter((skill): skill is string => typeof skill === 'string')
+        : [],
+    optionalSkills: Array.isArray(rawVacancy.optionalSkills)
+      ? rawVacancy.optionalSkills.filter((skill): skill is string => typeof skill === 'string')
+      : Array.isArray(rawVacancy.optional_skills)
+        ? (rawVacancy.optional_skills as unknown[]).filter((skill): skill is string => typeof skill === 'string')
+        : [],
+    responsibilities: Array.isArray(rawVacancy.responsibilities)
+      ? rawVacancy.responsibilities.filter((item): item is string => typeof item === 'string')
+      : [],
+    contractType:
+      typeof rawVacancy.contractType === 'string'
+        ? rawVacancy.contractType
+        : typeof rawVacancy.contract_type === 'string'
+          ? rawVacancy.contract_type
+          : undefined,
+    seniority:
+      typeof rawVacancy.seniority === 'string' ? rawVacancy.seniority : undefined,
+    salaryMin:
+      typeof rawVacancy.salaryMin === 'number'
+        ? rawVacancy.salaryMin
+        : typeof rawVacancy.salary_min === 'number'
+          ? rawVacancy.salary_min
+          : undefined,
+    salaryMax:
+      typeof rawVacancy.salaryMax === 'number'
+        ? rawVacancy.salaryMax
+        : typeof rawVacancy.salary_max === 'number'
+          ? rawVacancy.salary_max
+          : undefined,
+    location: typeof rawVacancy.location === 'string' ? rawVacancy.location : undefined,
+    modality: typeof rawVacancy.modality === 'string' ? rawVacancy.modality : undefined,
+    vacancies: typeof rawVacancy.vacancies === 'number' ? rawVacancy.vacancies : undefined,
+    createdAt:
+      typeof rawVacancy.createdAt === 'string'
+        ? rawVacancy.createdAt
+        : typeof rawVacancy.created_at === 'string'
+          ? rawVacancy.created_at
+          : new Date().toISOString(),
+  };
 };
 
 /**
@@ -542,8 +645,74 @@ export const createRecruiterSkill = async (
  */
 export const getMyVacancies = async (): Promise<RecruiterVacancy[]> => {
   try {
-    const response = await api.get<RecruiterVacancy[]>('/recruiter/vacancies');
-    return response.data || [];
+    const response = await api.get<
+      RecruiterVacancy[] | { data?: RecruiterVacancy[]; items?: RecruiterVacancy[]; vacancies?: RecruiterVacancy[] }
+    >('/recruiter/vacancies');
+
+    const payload = response.data;
+    const rawVacancies = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload?.vacancies)
+            ? payload.vacancies
+            : [];
+
+    return rawVacancies.map((vacancy) => {
+      const rawVacancy = vacancy as unknown as Record<string, unknown>;
+
+      return {
+        id: String(rawVacancy.id || rawVacancy._id || ''),
+        companyId: String(rawVacancy.companyId || rawVacancy.company_id || ''),
+        title: String(rawVacancy.title || ''),
+        area: typeof rawVacancy.area === 'string' ? rawVacancy.area : undefined,
+        description: String(rawVacancy.description || ''),
+        requiredSkills: Array.isArray(rawVacancy.requiredSkills)
+          ? rawVacancy.requiredSkills.filter((skill): skill is string => typeof skill === 'string')
+          : Array.isArray(rawVacancy.required_skills)
+            ? (rawVacancy.required_skills as unknown[]).filter((skill): skill is string => typeof skill === 'string')
+            : [],
+        optionalSkills: Array.isArray(rawVacancy.optionalSkills)
+          ? rawVacancy.optionalSkills.filter((skill): skill is string => typeof skill === 'string')
+          : Array.isArray(rawVacancy.optional_skills)
+            ? (rawVacancy.optional_skills as unknown[]).filter((skill): skill is string => typeof skill === 'string')
+            : [],
+        responsibilities: Array.isArray(rawVacancy.responsibilities)
+          ? rawVacancy.responsibilities.filter((item): item is string => typeof item === 'string')
+          : [],
+        contractType:
+          typeof rawVacancy.contractType === 'string'
+            ? rawVacancy.contractType
+            : typeof rawVacancy.contract_type === 'string'
+              ? rawVacancy.contract_type
+              : undefined,
+        seniority:
+          typeof rawVacancy.seniority === 'string' ? rawVacancy.seniority : undefined,
+        salaryMin:
+          typeof rawVacancy.salaryMin === 'number'
+            ? rawVacancy.salaryMin
+            : typeof rawVacancy.salary_min === 'number'
+              ? rawVacancy.salary_min
+              : undefined,
+        salaryMax:
+          typeof rawVacancy.salaryMax === 'number'
+            ? rawVacancy.salaryMax
+            : typeof rawVacancy.salary_max === 'number'
+              ? rawVacancy.salary_max
+              : undefined,
+        location: typeof rawVacancy.location === 'string' ? rawVacancy.location : undefined,
+        modality: typeof rawVacancy.modality === 'string' ? rawVacancy.modality : undefined,
+        vacancies: typeof rawVacancy.vacancies === 'number' ? rawVacancy.vacancies : undefined,
+        createdAt:
+          typeof rawVacancy.createdAt === 'string'
+            ? rawVacancy.createdAt
+            : typeof rawVacancy.created_at === 'string'
+              ? rawVacancy.created_at
+              : new Date().toISOString(),
+      };
+    });
   } catch (error: unknown) {
     console.warn('Recruiter vacancies endpoint not available', error);
     return [];

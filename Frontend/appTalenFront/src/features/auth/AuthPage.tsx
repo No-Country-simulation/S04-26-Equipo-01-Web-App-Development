@@ -17,11 +17,20 @@ import {
   FormHelperText,
 } from '@mui/material';
 import { Google, LinkedIn, Visibility, VisibilityOff } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { loginUser, registerUser } from '../../services/auth.service';
 import { UserRole, type AuthUser, type LoginDto, type RegisterDto } from '../../types/auth.types';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+const getOAuthUrl = (
+  provider: 'google' | 'linkedin',
+  selectedRole: 'talento' | 'empresa',
+): string => {
+  const base = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+  const role = selectedRole === 'empresa' ? UserRole.COMPANY : UserRole.TALENT;
+  return `${base}/auth/${provider}?role=${role}`;
+};
 
 interface AuthPageProps {
   onLoginSuccess: (user: AuthUser) => void;
@@ -94,11 +103,18 @@ const validateRegisterPassword = (password: string): string | undefined => {
 
 export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, handleAdminLogin }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const oauthError = searchParams.get('oauthError');
   const [internalTab, setInternalTab] = useState<number>(externalTab ?? 0); // 0 = Iniciar sesión, 1 = Registrarse
-  const [role, setRole] = useState<'talento' | 'empresa'>('talento');
+  const queryRole = searchParams.get('role');
+  const initialRole = queryRole === 'empresa' ? 'empresa' : 'talento';
+  const [role, setRole] = useState<'talento' | 'empresa'>(initialRole);
   const [formData, setFormData] = useState({ email: '', password: '', name: '' });
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<FormErrors>(() =>
+    oauthError ? { general: oauthError } : {},
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirectingOAuth, setIsRedirectingOAuth] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const handleClickShowPassword = () => setShowPassword((show) => !show);
   const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -221,6 +237,11 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
     }
   };
 
+  const redirectToOAuth = (provider: 'google' | 'linkedin') => {
+    setIsRedirectingOAuth(true);
+    window.location.href = getOAuthUrl(provider, role);
+  };
+
   return (
     <Container maxWidth="sm" sx={{ py: 8 }}>
       <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
@@ -337,22 +358,26 @@ export const AuthPage: FC<AuthPageProps> = ({ onLoginSuccess, tab: externalTab, 
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Button 
+            type="button"
             variant="outlined" 
             startIcon={<Google />} 
             fullWidth 
             sx={{ borderColor: '#2D3748', color: '#2D3748' }}
-            onClick={() => window.location.href = `${apiBaseUrl}/auth/google`}
+            disabled={isRedirectingOAuth}
+            onClick={() => redirectToOAuth('google')}
           >
-            Google
+            {isRedirectingOAuth ? 'Redirigiendo...' : 'Continuar con Google'}
           </Button>
           <Button 
+            type="button"
             variant="outlined" 
             startIcon={<LinkedIn />} 
             fullWidth 
             sx={{ borderColor: '#0A66C2', color: '#0A66C2' }}
-            onClick={() => window.location.href = `${apiBaseUrl}/auth/linkedin`}
+            disabled={isRedirectingOAuth}
+            onClick={() => redirectToOAuth('linkedin')}
           >
-            LinkedIn
+            {isRedirectingOAuth ? 'Redirigiendo...' : 'Continuar con LinkedIn'}
           </Button>
         </Box>
       </Paper>

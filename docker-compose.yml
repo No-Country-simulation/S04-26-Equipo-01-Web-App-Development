@@ -28,9 +28,11 @@ services:
     build:
       context: ./Frontend/appTalenFront
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     container_name: app-talen-frontend
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     depends_on:
       - api
     ports:

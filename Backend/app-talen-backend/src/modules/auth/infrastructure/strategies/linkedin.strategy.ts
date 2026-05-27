@@ -15,12 +15,16 @@ interface LinkedInUserInfoResponse {
 @Injectable()
 export class LinkedInStrategy extends PassportStrategy(Strategy, 'linkedin') {
   constructor(private configService: ConfigService) {
+    const callbackURL =
+      configService.get<string>('LINKEDIN_CALLBACK_URL') ||
+      'http://localhost:3000/auth/linkedin/callback';
+
     super({
       authorizationURL: 'https://www.linkedin.com/oauth/v2/authorization',
       tokenURL: 'https://www.linkedin.com/oauth/v2/accessToken',
       clientID: configService.get<string>('LINKEDIN_CLIENT_ID')!,
       clientSecret: configService.get<string>('LINKEDIN_CLIENT_SECRET')!,
-      callbackURL: 'http://localhost:3000/auth/linkedin/callback',
+      callbackURL,
       scope: ['openid', 'profile', 'email'],
     });
   }

@@ -24,6 +24,9 @@ export class User {
   @Column({ nullable: true })
   imageUrl?: string;
 
+  @Column({ nullable: true, unique: true })
+  linkedinProviderId?: string;
+
   @Column({
     type: 'enum',
     enum: UserRole,

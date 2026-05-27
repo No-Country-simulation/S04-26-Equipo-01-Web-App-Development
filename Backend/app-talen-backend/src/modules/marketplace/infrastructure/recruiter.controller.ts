@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -21,6 +22,7 @@ import { Profile } from '../../profiles/infrastructure/entities/profile.entity';
 import type { AuthenticatedRequest } from '../../auth/infrastructure/types/authenticated-request.type';
 import { CreateVacancyDto } from '../application/dto/create-vacancy.dto';
 import { CreateRecruiterSkillDto } from '../application/dto/create-recruiter-skill.dto';
+import { UpsertCandidateFeedbackDto } from '../application/dto/upsert-candidate-feedback.dto';
 
 @ApiTags('Recruiter')
 @ApiBearerAuth()
@@ -197,6 +199,34 @@ export class RecruiterController {
       vacancyId,
       candidateId,
       'ACCEPTED',
+    );
+  }
+
+  @Put('vacancies/:vacancyId/candidates/:candidateId/feedback')
+  @ApiOperation({
+    summary: 'Crear o editar feedback de candidato en pipeline',
+    description:
+      'Guarda feedback textual del reclutador para candidatos seleccionados, finalistas o aceptados.',
+  })
+  @ApiBody({
+    type: UpsertCandidateFeedbackDto,
+    description: 'Feedback textual del candidato para esta vacante.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Feedback guardado correctamente.',
+  })
+  async upsertCandidateFeedback(
+    @Req() request: AuthenticatedRequest,
+    @Param('vacancyId') vacancyId: string,
+    @Param('candidateId') candidateId: string,
+    @Body() payload: UpsertCandidateFeedbackDto,
+  ) {
+    return this.marketplaceService.upsertCandidateFeedback(
+      request.user.userId,
+      vacancyId,
+      candidateId,
+      payload,
     );
   }
 

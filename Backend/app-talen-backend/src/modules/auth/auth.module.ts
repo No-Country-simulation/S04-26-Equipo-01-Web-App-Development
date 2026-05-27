@@ -7,21 +7,18 @@ import { UsersModule } from '../users/users.module';
 import { User } from '../users/infrastructure/entities/user.entity';
 import { AuthService } from './application/auth.service';
 import { JwtAuthGuard } from './infrastructure/guards/jwt-auth.guard';
+import { GoogleAuthGuard } from './infrastructure/guards/google-auth.guard';
+import { LinkedInAuthGuard } from './infrastructure/guards/linkedin-auth.guard';
 import { AuthController } from './infrastructure/auth.controller';
 import { LinkedInStrategy } from './infrastructure/strategies/linkedin.strategy';
 import { GoogleStrategy } from './infrastructure/strategies/google.strategy';
-
-const hasLinkedInCredentials =
-  Boolean(process.env.LINKEDIN_CLIENT_ID) &&
-  Boolean(process.env.LINKEDIN_CLIENT_SECRET);
-const hasGoogleCredentials =
-  Boolean(process.env.GOOGLE_CLIENT_ID) &&
-  Boolean(process.env.GOOGLE_CLIENT_SECRET);
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     ConfigModule,
     PassportModule,
+    MailModule,
     UsersModule,
     TypeOrmModule.forFeature([User]),
     JwtModule.registerAsync({
@@ -49,8 +46,10 @@ const hasGoogleCredentials =
   providers: [
     AuthService,
     JwtAuthGuard,
-    ...(hasLinkedInCredentials ? [LinkedInStrategy] : []),
-    ...(hasGoogleCredentials ? [GoogleStrategy] : []),
+    GoogleAuthGuard,
+    LinkedInAuthGuard,
+    LinkedInStrategy,
+    GoogleStrategy,
   ],
   exports: [JwtModule, JwtAuthGuard],
 })

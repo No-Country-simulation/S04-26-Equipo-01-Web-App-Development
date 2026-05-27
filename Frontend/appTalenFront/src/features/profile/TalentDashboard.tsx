@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { 
   Box, 
   Typography, 
@@ -25,6 +25,10 @@ import {
 import { createMySkill, getMySkills, updateMySkill } from '../../services/skill.service';
 import { getMyAllTestResults } from '../../services/assessment.service';
 import { getMyLearningPaths } from '../../services/learning.service';
+import {
+  getMyRecruiterFeedback,
+  type TalentRecruiterFeedback,
+} from '../../services/recruiter.service';
 import type { CvDiagnostic } from '../../types/profile.types';
 import type { SkillLevel, UserSkill } from '../../types/skill.types';
 import type { AssessmentTestResultEntity } from '../../types/assessment.types';
@@ -39,6 +43,13 @@ interface TalentDashboardProps {
 export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   const SKILL_CATEGORY_TECHNICAL = 'TECHNICAL';
   const SKILL_CATEGORY_PERSONAL = 'PERSONAL';
+  const LEARNING_MENU_ITEMS = [
+    'Mi Ruta de Cursos',
+    'Pendientes',
+    'En Ejecucion',
+    'Resultados (Diplomas)',
+  ] as const;
+
   const sidebarSections = [
     {
       title: 'EVALUACION PERFIL',
@@ -53,8 +64,12 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
       items: ['Ver CV Actual', 'Cargar Nuevo CV', 'Actualizar Datos'],
     },
     {
-      title: 'FORMACION',
-      items: ['Mi Ruta de Cursos', 'Pendientes', 'En Ejecucion', 'Resultados (Diplomas)'],
+      title: 'FORMACIÓN',
+      items: [...LEARNING_MENU_ITEMS],
+    },
+    {
+      title: 'POSTULACIONES',
+      items: ['Feedback de Reclutador'],
     },
   ];
 
@@ -62,7 +77,8 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
     'EVALUACION PERFIL': true,
     SKILLS: true,
     'MI CV PROFESIONAL': true,
-    FORMACION: true,
+    'FORMACIÓN': true,
+    POSTULACIONES: true,
   });
   const [selectedMenuItem, setSelectedMenuItem] = useState<string | null>(null);
   const [selectedCvFile, setSelectedCvFile] = useState<File | null>(null);
@@ -85,7 +101,58 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   const [onboardingModeEnabled, setOnboardingModeEnabled] = useState(false);
   const [skillsVerified, setSkillsVerified] = useState(false);
   const [learningRoadmapRefreshToken, setLearningRoadmapRefreshToken] = useState(0);
+  const [talentFeedback, setTalentFeedback] = useState<TalentRecruiterFeedback[]>(
+    [],
+  );
+  const [loadingTalentFeedback, setLoadingTalentFeedback] = useState(false);
+  const [talentFeedbackError, setTalentFeedbackError] = useState<string | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const initialLoadTriggeredRef = useRef(false);
+
+  const ensureParsedCvData = (data: ParsedCvDataAdvanced): ParsedCvDataAdvanced => ({
+    profile: {
+      fullName: data?.profile?.fullName ?? '',
+      email: data?.profile?.email ?? '',
+      phone: data?.profile?.phone ?? '',
+      location: data?.profile?.location ?? '',
+      title: data?.profile?.title ?? '',
+      professionalSummary: data?.profile?.professionalSummary ?? '',
+    },
+    socialLinks: data?.socialLinks,
+    experience: Array.isArray(data?.experience)
+      ? data.experience.map((item) => ({
+          company: item?.company ?? '',
+          position: item?.position ?? '',
+          startDate: item?.startDate ?? '',
+          endDate: item?.endDate ?? '',
+          description: item?.description ?? '',
+          highlights: Array.isArray(item?.highlights)
+            ? item.highlights.filter((value) => typeof value === 'string')
+            : undefined,
+        }))
+      : [],
+    education: Array.isArray(data?.education)
+      ? data.education.map((item) => ({
+          institution: item?.institution ?? '',
+          degree: item?.degree ?? '',
+          details: item?.details ?? '',
+          status:
+            item?.status === 'completed' || item?.status === 'in-progress'
+              ? item.status
+              : undefined,
+        }))
+      : [],
+    skills: {
+      technical: Array.isArray(data?.skills?.technical)
+        ? data.skills.technical.filter((value) => typeof value === 'string')
+        : [],
+      personal: Array.isArray(data?.skills?.personal)
+        ? data.skills.personal.filter((value) => typeof value === 'string')
+        : [],
+    },
+  });
 
   const toParsedCvData = (diagnostic: CvDiagnostic): ParsedCvDataAdvanced | null => {
     const snapshot = diagnostic.snapshot as
@@ -160,6 +227,12 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   const onboardingSkillsVerifiedKey = `${onboardingStorageKey}-skills-verified`;
 
   useEffect(() => {
+    if (initialLoadTriggeredRef.current) {
+      return;
+    }
+
+    initialLoadTriggeredRef.current = true;
+
     const loadProfileData = async () => {
       try {
         const [diagnostic, skills, tests, paths] = await Promise.all([
@@ -199,8 +272,9 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
         setLatestDiagnostic(diagnostic);
         const parsedCvData = toParsedCvData(diagnostic);
         if (parsedCvData) {
-          setAdvancedCvData(parsedCvData);
-          setCvFormData(parsedCvData);
+          const safeParsedData = ensureParsedCvData(parsedCvData);
+          setAdvancedCvData(safeParsedData);
+          setCvFormData(safeParsedData);
         }
       } catch {
         setLatestDiagnostic(null);
@@ -312,6 +386,10 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   const hasTechnicalSkillsPersisted = profileSkills.some(
     (userSkill) => userSkill.skill?.category?.toLowerCase().includes('technical') ?? false,
   );
+  const hasTechnicalSkillsInCvDraft = (cvFormData?.skills.technical ?? []).some(
+    (skill) => skill.trim().length > 0,
+  );
+  const canConfirmSkillsAndContinue = hasTechnicalSkillsPersisted || hasTechnicalSkillsInCvDraft;
   const hasVerifiedSkills = hasSkillsGenerated && skillsVerified;
   const hasRoadmapGenerated = learningPaths.length > 0;
   const hasPsychotechnicalResults = assessmentTestResults.some(
@@ -334,6 +412,26 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   const coursesInProgress = learningPaths
     .flatMap((path) => path.modules ?? [])
     .filter((module) => module.progress?.[0]?.status === 'IN_PROGRESS').length;
+
+  const learningCoursesForCv = useMemo(() => {
+    const modules = learningPaths.flatMap((path) =>
+      (path.modules ?? []).map((module) => ({
+        id: module.id,
+        title: module.title,
+        status: module.progress?.[0]?.status ?? 'PENDING',
+      })),
+    );
+
+    const viewed = modules.filter(
+      (module) => module.status === 'IN_PROGRESS' || module.status === 'COMPLETED',
+    );
+    const approved = modules.filter((module) => module.status === 'COMPLETED');
+
+    return {
+      viewed,
+      approved,
+    };
+  }, [learningPaths]);
 
   const validatedSkills = `+${profileSkills.length}`;
 
@@ -705,6 +803,33 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
     }));
   };
 
+  const loadTalentRecruiterFeedback = async () => {
+    setLoadingTalentFeedback(true);
+    setTalentFeedbackError(null);
+
+    try {
+      const feedbacks = await getMyRecruiterFeedback();
+      setTalentFeedback(feedbacks);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo cargar el feedback de reclutadores.';
+      setTalentFeedbackError(message);
+      setTalentFeedback([]);
+    } finally {
+      setLoadingTalentFeedback(false);
+    }
+  };
+
+  const handleMenuSelection = (item: string | null) => {
+    setSelectedMenuItem(item);
+
+    if (item === 'Feedback de Reclutador') {
+      void loadTalentRecruiterFeedback();
+    }
+  };
+
   const handleCvSelection = (file: File | null) => {
     if (!file) {
       setSelectedCvFile(null);
@@ -712,7 +837,10 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
       return;
     }
 
-    if (file.type !== 'application/pdf') {
+    const hasPdfMime = file.type === 'application/pdf';
+    const hasPdfExtension = file.name.toLowerCase().endsWith('.pdf');
+
+    if (!hasPdfMime && !hasPdfExtension) {
       setSelectedCvFile(null);
       setCvError('Solo se permiten archivos PDF.');
       return;
@@ -727,6 +855,8 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
 
     setSelectedCvFile(file);
     setCvError(null);
+    setSaveErrorMessage(null);
+    setSaveSuccessMessage(null);
   };
 
   const readPdfText = async (file: File): Promise<string> => {
@@ -743,32 +873,63 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
       const textContent = await page.getTextContent();
-      const lines: string[] = [];
-      let currentLine = '';
+      const positionedTokens = textContent.items
+        .map((item) => {
+          if (!('str' in item) || !Array.isArray((item as { transform?: unknown }).transform)) {
+            return null;
+          }
 
-      textContent.items.forEach((item) => {
-        if (!('str' in item)) {
-          return;
-        }
+          const chunk = item.str.trim();
+          const transform = (item as { transform: number[] }).transform;
+          if (!chunk || transform.length < 6) {
+            return null;
+          }
 
-        const chunk = item.str.trim();
-        if (!chunk) {
-          return;
-        }
+          return {
+            text: chunk,
+            x: Number(transform[4]) || 0,
+            y: Number(transform[5]) || 0,
+          };
+        })
+        .filter((token): token is { text: string; x: number; y: number } => token !== null);
 
-        currentLine = currentLine ? `${currentLine} ${chunk}` : chunk;
-
-        if ('hasEOL' in item && item.hasEOL) {
-          lines.push(currentLine.trim());
-          currentLine = '';
-        }
-      });
-
-      if (currentLine) {
-        lines.push(currentLine.trim());
+      if (positionedTokens.length === 0) {
+        pagesText.push('');
+        continue;
       }
 
-      const pageText = lines.join('\n');
+      positionedTokens.sort((a, b) => {
+        if (Math.abs(a.y - b.y) < 1.5) {
+          return a.x - b.x;
+        }
+
+        return b.y - a.y;
+      });
+
+      const lines: Array<{ y: number; tokens: Array<{ text: string; x: number }> }> = [];
+      const lineTolerance = 2;
+
+      positionedTokens.forEach((token) => {
+        const currentLine = lines[lines.length - 1];
+        if (!currentLine || Math.abs(currentLine.y - token.y) > lineTolerance) {
+          lines.push({ y: token.y, tokens: [{ text: token.text, x: token.x }] });
+          return;
+        }
+
+        currentLine.tokens.push({ text: token.text, x: token.x });
+      });
+
+      const pageText = lines
+        .map((line) =>
+          line.tokens
+            .sort((a, b) => a.x - b.x)
+            .map((token) => token.text)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim(),
+        )
+        .filter(Boolean)
+        .join('\n');
 
       pagesText.push(pageText);
     }
@@ -786,15 +947,27 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
       setIsProcessingCv(true);
       setCvError(null);
       setCvInfoMessage(null);
+      setSaveErrorMessage(null);
+      setSaveSuccessMessage(null);
 
       const cvRawText = await readPdfText(selectedCvFile);
+
+      if (!cvRawText.trim()) {
+        setCvError(
+          'No se detecto texto en el PDF. Si es un escaneo, usa un PDF con texto seleccionable (OCR).',
+        );
+        return;
+      }
+
       setRawCvText(cvRawText);
       
-      const advancedData = parseAdvancedCv(cvRawText);
+      const advancedData = ensureParsedCvData(parseAdvancedCv(cvRawText));
       setAdvancedCvData(advancedData);
       setCvFormData(advancedData);
       
-      setCvInfoMessage('✅ PDF procesado correctamente. JSON generado con todas las experiencias y datos.');
+      setCvInfoMessage(
+        '✅ PDF procesado correctamente. Revisa el formulario y pulsa "Guardar CV" para subirlo al backend.',
+      );
     } catch (error) {
       const detail = error instanceof Error ? error.message : 'Error desconocido';
       setCvError(`No fue posible leer el PDF. Verifica el archivo e intenta nuevamente. Detalle: ${detail}`);
@@ -818,7 +991,7 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
           <Typography
             component="button"
             type="button"
-            onClick={() => setSelectedMenuItem(null)}
+            onClick={() => handleMenuSelection(null)}
             sx={{
               fontSize: '2rem',
               fontWeight: 800,
@@ -875,7 +1048,7 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                     key={item}
                     component="button"
                     type="button"
-                    onClick={() => setSelectedMenuItem(item)}
+                    onClick={() => handleMenuSelection(item)}
                     sx={{
                       width: '100%',
                       border: 'none',
@@ -903,14 +1076,16 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Box
           sx={{
-            height: 58,
+            minHeight: 58,
             bgcolor: '#F8FBFF',
             borderBottom: '1px solid #D7E1EC',
             px: { xs: 2, md: 4 },
+            py: { xs: 1.2, md: 0 },
             display: 'flex',
             justifyContent: 'flex-end',
             alignItems: 'center',
             gap: 1.5,
+            flexWrap: { xs: 'wrap', md: 'nowrap' },
           }}
         >
           <Typography sx={{ fontWeight: 700, color: '#1F3557' }}>Hola, {user?.name || 'Talent'}</Typography>
@@ -920,6 +1095,45 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
         </Box>
 
         <Box sx={{ p: { xs: 2, md: 4 } }}>
+          <Box
+            sx={{
+              display: { xs: 'grid', md: 'none' },
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+              gap: 1,
+              pb: 1.2,
+              mb: 1.2,
+            }}
+          >
+            {sidebarSections.flatMap((section) =>
+              section.items.map((item) => (
+                <Button
+                  key={`mobile-talent-${item}`}
+                  variant={selectedMenuItem === item ? 'contained' : 'outlined'}
+                  onClick={() => handleMenuSelection(item)}
+                  sx={{
+                    width: '100%',
+                    minHeight: 42,
+                    px: 1,
+                    py: 0.8,
+                    whiteSpace: 'normal',
+                    lineHeight: 1.2,
+                    textAlign: 'center',
+                    fontSize: '0.78rem',
+                    textTransform: 'none',
+                    borderColor: '#173A68',
+                    color: selectedMenuItem === item ? '#fff' : '#173A68',
+                    bgcolor: selectedMenuItem === item ? '#173A68' : 'transparent',
+                    '&:hover': {
+                      bgcolor: selectedMenuItem === item ? '#112D51' : 'rgba(23,58,104,0.08)',
+                    },
+                  }}
+                >
+                  {item}
+                </Button>
+              )),
+            )}
+          </Box>
+
           {selectedMenuItem === null ? (
             <>
               <Paper
@@ -1163,7 +1377,7 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                       PROCESANDO CV
                     </Box>
                   ) : (
-                    'SUBIR CV'
+                    'PROCESAR CV'
                   )}
                 </Button>
                 <Button
@@ -1491,7 +1705,8 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                         onChange={(event) => updateSkills('technical', event.target.value)}
                         fullWidth
                         multiline
-                        minRows={3}
+                        minRows={4}
+                        maxRows={4}
                       />
                       <TextField
                         label="Skills personales (separadas por coma)"
@@ -1499,7 +1714,8 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                         onChange={(event) => updateSkills('personal', event.target.value)}
                         fullWidth
                         multiline
-                        minRows={3}
+                        minRows={4}
+                        maxRows={4}
                       />
                     </Box>
                   </Box>
@@ -1682,6 +1898,56 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                             <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>Sin skills personales registradas</Typography>
                           )}
                         </Box>
+                      </Box>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ mt: 2.2, p: 2, borderRadius: 2, border: '1px solid #C9D7E8', bgcolor: '#F9FCFF' }}>
+                    <Typography sx={{ fontWeight: 700, color: '#1F3E69', mb: 1.5 }}>
+                      Formacion y Cursos
+                    </Typography>
+
+                    <Box sx={{ display: 'grid', gap: 1.5 }}>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.9rem', color: '#6E819A', fontWeight: 700, mb: 0.8 }}>
+                          Cursos vistos ({learningCoursesForCv.viewed.length})
+                        </Typography>
+                        {learningCoursesForCv.viewed.length > 0 ? (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                            {learningCoursesForCv.viewed.map((course) => (
+                              <Chip
+                                key={`cv-viewed-course-${course.id}`}
+                                label={course.title}
+                                sx={{ bgcolor: '#E3F2FD', color: '#1565C0', fontWeight: 600 }}
+                              />
+                            ))}
+                          </Box>
+                        ) : (
+                          <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>
+                            Aun no tienes cursos vistos.
+                          </Typography>
+                        )}
+                      </Box>
+
+                      <Box>
+                        <Typography sx={{ fontSize: '0.9rem', color: '#6E819A', fontWeight: 700, mb: 0.8 }}>
+                          Cursos aprobados ({learningCoursesForCv.approved.length})
+                        </Typography>
+                        {learningCoursesForCv.approved.length > 0 ? (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                            {learningCoursesForCv.approved.map((course) => (
+                              <Chip
+                                key={`cv-approved-course-${course.id}`}
+                                label={course.title}
+                                sx={{ bgcolor: '#E8F5E9', color: '#1B5E20', fontWeight: 600 }}
+                              />
+                            ))}
+                          </Box>
+                        ) : (
+                          <Typography sx={{ color: '#5C6F86', fontSize: '0.9rem' }}>
+                            Aun no tienes cursos aprobados.
+                          </Typography>
+                        )}
                       </Box>
                     </Box>
                   </Box>
@@ -1967,6 +2233,61 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
               mode="completed"
               refreshToken={learningRoadmapRefreshToken}
             />
+          ) : selectedMenuItem === 'Feedback de Reclutador' ? (
+            <Paper
+              sx={{
+                p: { xs: 3, md: 5 },
+                borderRadius: 3,
+                boxShadow: '0px 3px 10px rgba(11,38,69,0.08)',
+              }}
+            >
+              <Typography sx={{ fontSize: { xs: '1.5rem', md: '2rem' }, fontWeight: 800, color: '#1F3E69' }}>
+                Feedback de Reclutador
+              </Typography>
+              <Typography sx={{ mt: 1.2, color: '#5C6F86', maxWidth: 760 }}>
+                Aqui encuentras observaciones de reclutadores en tus etapas de seleccionado, finalista y aceptado.
+              </Typography>
+
+              {loadingTalentFeedback ? (
+                <Box sx={{ mt: 2.2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CircularProgress size={20} />
+                  <Typography sx={{ color: '#5C6F86' }}>Cargando feedback...</Typography>
+                </Box>
+              ) : talentFeedbackError ? (
+                <Typography sx={{ mt: 2.2, color: '#B42318', fontWeight: 700 }}>
+                  {talentFeedbackError}
+                </Typography>
+              ) : talentFeedback.length === 0 ? (
+                <Typography sx={{ mt: 2.2, color: '#5C6F86' }}>
+                  Aun no tienes feedback registrado por reclutadores.
+                </Typography>
+              ) : (
+                <Box sx={{ mt: 2.2, display: 'grid', gap: 1.2 }}>
+                  {talentFeedback.map((item) => (
+                    <Card key={item.applicationId} sx={{ border: '1px solid #D8E3F0' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                          <Typography sx={{ fontWeight: 800, color: '#173A68' }}>
+                            {item.vacancyTitle}
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={`Etapa: ${item.stage}`}
+                            sx={{ bgcolor: '#EAF3FF', color: '#1F3E69' }}
+                          />
+                        </Box>
+                        <Typography sx={{ mt: 1, color: '#314A66' }}>
+                          {item.feedback}
+                        </Typography>
+                        <Typography sx={{ mt: 1, color: '#6D7F94', fontSize: '0.82rem' }}>
+                          Fecha: {new Date(item.createdAt).toLocaleString()}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              )}
+            </Paper>
           ) : selectedMenuItem === 'Editar Skills' ? (
             <Paper
               sx={{
@@ -2115,7 +2436,7 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                       <Button
                         variant="contained"
                         onClick={handleConfirmSkillsAndContinue}
-                        disabled={!hasSkillsGenerated || isConfirmingSkills}
+                        disabled={!canConfirmSkillsAndContinue || isConfirmingSkills}
                         sx={{
                           bgcolor: '#173A68',
                           color: '#fff',
@@ -2127,9 +2448,9 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
                           ? 'GUARDANDO Y ABRIENDO PRUEBA TECNICA...'
                           : 'CONFIRMAR SKILLS Y CONTINUAR A PRUEBA TECNICA'}
                       </Button>
-                      {!hasTechnicalSkillsPersisted && !isConfirmingSkills && (
+                      {!canConfirmSkillsAndContinue && !isConfirmingSkills && (
                         <Typography sx={{ color: '#B42318', fontWeight: 600, alignSelf: 'center' }}>
-                          Para continuar necesitas al menos una skill tecnica guardada.
+                          Para continuar necesitas al menos una skill tecnica detectada en CV o guardada en backend.
                         </Typography>
                       )}
                     </Box>
