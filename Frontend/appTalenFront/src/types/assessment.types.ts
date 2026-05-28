@@ -56,6 +56,13 @@ export interface CreateAssessmentDto {
   answers: Record<string, unknown>;
 }
 
+export interface GenerateTestsForProfileDto {
+  technicalSkills?: string[];
+  professionalArea?: string;
+  headline?: string;
+  interestedRoles?: string[];
+}
+
 export const AssessmentTestType = {
   PSYCHOTECHNICAL: 'PSYCHOTECHNICAL',
   TECHNICAL: 'TECHNICAL',
