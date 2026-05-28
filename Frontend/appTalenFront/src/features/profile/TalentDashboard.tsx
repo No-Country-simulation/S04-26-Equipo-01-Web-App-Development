@@ -496,45 +496,37 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   };
 
   const handleConfirmSkillsAndContinue = async (): Promise<void> => {
-    try {
-      setIsConfirmingSkills(true);
-      setSaveErrorMessage(null);
-
-      if (cvFormData) {
-        await syncSkillsFromCv(cvFormData);
-      } else if (!hasTechnicalSkillsPersisted) {
-        setSaveErrorMessage(
-          'Para continuar necesitas al menos una skill tecnica guardada.',
-        );
-        return;
-      }
-
-      const refreshedSkills = await getMySkills();
-      const hasRefreshedTechnicalSkills = refreshedSkills.some(
-        (userSkill) => userSkill.skill?.category?.toLowerCase().includes('technical') ?? false,
+    if (!canConfirmSkillsAndContinue) {
+      setSaveErrorMessage(
+        'Para continuar necesitas al menos una skill tecnica detectada en CV o guardada en backend.',
       );
-
-      if (!hasRefreshedTechnicalSkills) {
-        setSaveErrorMessage(
-          'No encontramos skills tecnicas guardadas. Agrega al menos una para iniciar la prueba.',
-        );
-        return;
-      }
-
-      setProfileSkills(refreshedSkills);
-    } catch (error) {
-      const message = error instanceof Error
-        ? error.message
-        : 'No se pudieron sincronizar las skills antes de iniciar la prueba tecnica.';
-      setSaveErrorMessage(message);
       return;
-    } finally {
-      setIsConfirmingSkills(false);
     }
 
+    setSaveErrorMessage(null);
     window.localStorage.setItem(onboardingSkillsVerifiedKey, '1');
     setSkillsVerified(true);
     setSelectedMenuItem('Tecnica');
+
+    if (!cvFormData) {
+      return;
+    }
+
+    setIsConfirmingSkills(true);
+    void syncSkillsFromCv(cvFormData)
+      .then(() => getMySkills())
+      .then((refreshedSkills) => {
+        setProfileSkills(refreshedSkills);
+      })
+      .catch((error) => {
+        const message = error instanceof Error
+          ? error.message
+          : 'No se pudieron sincronizar las skills antes de iniciar la prueba tecnica.';
+        setSaveErrorMessage(message);
+      })
+      .finally(() => {
+        setIsConfirmingSkills(false);
+      });
   };
 
   const handleAssessmentTestCompleted = async (
@@ -588,7 +580,6 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
 
       if (existing) {
         await updateMySkill(existing.skillId, {
-          category: desiredSkill.category,
           level: toSkillLevel(),
           source: 'cv_auto',
         });
