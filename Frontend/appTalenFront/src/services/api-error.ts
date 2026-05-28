@@ -81,7 +81,7 @@ export const getBackendErrorMessage = (error: unknown): string => {
   }
 
   if (error.response?.status === 401) {
-    return 'Correo o contrasena incorrectos. Verifica tus datos e intenta nuevamente.';
+    return 'Correo o contraseña incorrectos. Verifica tus datos e intenta nuevamente.';
   }
 
   if (error.response?.status === 403) {
