@@ -97,11 +97,19 @@ DB_DATABASE=talent_db
 TYPEORM_SYNC=true
 JWT_SECRET=change-this-secret
 JWT_EXPIRES_IN=7d
+SEED_DEFAULT_ADMIN=true
+DEFAULT_ADMIN_EMAIL=admin@talen.local
+DEFAULT_ADMIN_PASSWORD=AdminTemp2026!
+DEFAULT_ADMIN_FORCE_SYNC=false
 ```
 
 `TYPEORM_SYNC=true` permite que TypeORM cree o sincronice tablas automaticamente durante desarrollo. Para produccion se recomienda usar migraciones y dejarlo en `false`.
 
 `JWT_EXPIRES_IN=7d` define que los tokens de autenticacion expiran a los 7 dias.
+
+Cuando `SEED_DEFAULT_ADMIN=true`, al iniciar la API se crea automaticamente un usuario ADMIN en la base de datos si no existe. Los datos se configuran con `DEFAULT_ADMIN_EMAIL` y `DEFAULT_ADMIN_PASSWORD`.
+
+Si `DEFAULT_ADMIN_FORCE_SYNC=true`, en cada inicio se vuelve a sincronizar ese usuario (rol ADMIN y password hasheada a partir de `DEFAULT_ADMIN_PASSWORD`).
 
 ## Autenticacion
 
