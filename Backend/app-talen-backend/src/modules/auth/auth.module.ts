@@ -13,6 +13,7 @@ import { AuthController } from './infrastructure/auth.controller';
 import { LinkedInStrategy } from './infrastructure/strategies/linkedin.strategy';
 import { GoogleStrategy } from './infrastructure/strategies/google.strategy';
 import { MailModule } from '../mail/mail.module';
+import { AdminBootstrapService } from './application/admin-bootstrap.service';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { MailModule } from '../mail/mail.module';
     LinkedInAuthGuard,
     LinkedInStrategy,
     GoogleStrategy,
+    AdminBootstrapService,
   ],
   exports: [JwtModule, JwtAuthGuard],
 })
