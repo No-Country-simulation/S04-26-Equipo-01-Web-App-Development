@@ -12,11 +12,15 @@ export const getBackendErrorMessage = (error: unknown): string => {
   }
 
   if (typeof backendMessage === 'string') {
+    if (backendMessage.toLowerCase() === 'invalid credentials') {
+      return 'Correo o contrasena incorrectos. Verifica tus datos e intenta nuevamente.';
+    }
+
     return backendMessage;
   }
 
   if (error.response?.status === 401) {
-    return 'No autorizado. Inicia sesion nuevamente.';
+    return 'Correo o contrasena incorrectos. Verifica tus datos e intenta nuevamente.';
   }
 
   if (error.response?.status === 403) {

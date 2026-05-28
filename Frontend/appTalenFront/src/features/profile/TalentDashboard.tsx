@@ -496,15 +496,31 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   };
 
   const handleConfirmSkillsAndContinue = async (): Promise<void> => {
-    if (!cvFormData) {
-      return;
-    }
-
     try {
       setIsConfirmingSkills(true);
       setSaveErrorMessage(null);
-      await syncSkillsFromCv(cvFormData);
+
+      if (cvFormData) {
+        await syncSkillsFromCv(cvFormData);
+      } else if (!hasTechnicalSkillsPersisted) {
+        setSaveErrorMessage(
+          'Para continuar necesitas al menos una skill tecnica guardada.',
+        );
+        return;
+      }
+
       const refreshedSkills = await getMySkills();
+      const hasRefreshedTechnicalSkills = refreshedSkills.some(
+        (userSkill) => userSkill.skill?.category?.toLowerCase().includes('technical') ?? false,
+      );
+
+      if (!hasRefreshedTechnicalSkills) {
+        setSaveErrorMessage(
+          'No encontramos skills tecnicas guardadas. Agrega al menos una para iniciar la prueba.',
+        );
+        return;
+      }
+
       setProfileSkills(refreshedSkills);
     } catch (error) {
       const message = error instanceof Error
