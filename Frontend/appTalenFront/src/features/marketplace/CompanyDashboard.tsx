@@ -428,6 +428,10 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
       items: ['Perfil Candidato', 'Skills Validadas', 'CV / Living Profile', 'Cursos Realizados'],
     },
     {
+      title: 'ACADEMIA',
+      items: ['Cursos', 'Talleres'],
+    },
+    {
       title: 'VACANTES / SOLICITUD',
       items: ['Crear Solicitud', 'Mis Solicitudes', 'Candidatos Preseleccionados', 'Seleccionados', 'Finalistas'],
     },
@@ -435,6 +439,7 @@ export const CompanyDashboard = ({ user }: CompanyDashboardProps) => {
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     TALENTO: true,
+    ACADEMIA: true,
     'VACANTES / SOLICITUD': true,
   });
   const [selectedMenuItem, setSelectedMenuItem] = useState<string | null>(null);

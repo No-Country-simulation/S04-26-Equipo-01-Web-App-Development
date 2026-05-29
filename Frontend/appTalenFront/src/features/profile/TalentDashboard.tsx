@@ -45,8 +45,8 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
   const SKILL_CATEGORY_PERSONAL = 'PERSONAL';
   const LEARNING_MENU_ITEMS = [
     'Mi Ruta de Cursos',
-    'Pendientes',
-    'En Ejecucion',
+    'Cursos Pendientes',
+    'Cursos En Ejecucion',
     'Resultados (Diplomas)',
   ] as const;
 
@@ -2218,12 +2218,12 @@ export const TalentDashboard = ({ user }: TalentDashboardProps) => {
               mode="all"
               refreshToken={learningRoadmapRefreshToken}
             />
-          ) : selectedMenuItem === 'Pendientes' ? (
+          ) : selectedMenuItem === 'Cursos Pendientes' ? (
             <LearningRoadmapPanel
               mode="pending"
               refreshToken={learningRoadmapRefreshToken}
             />
-          ) : selectedMenuItem === 'En Ejecucion' ? (
+          ) : selectedMenuItem === 'Cursos En Ejecucion' ? (
             <LearningRoadmapPanel
               mode="in-progress"
               refreshToken={learningRoadmapRefreshToken}
