@@ -123,11 +123,10 @@ export const AssessmentTestsPanel = ({
     };
   }, [activeTab, extractProfessionalAreaFromDiagnostic, formatInterestedRole]);
 
-  const contextualProfessionalArea = testsContext?.professionalArea;
-
   const buildFallbackTest = useCallback((
     type: 'TECHNICAL' | 'PSYCHOTECHNICAL',
     questions: AssessmentTestQuestion[],
+    context?: GenerateTestsForProfileDto,
   ): GeneratedTest => ({
     id: `${type.toLowerCase()}-fallback-test`,
     name:
@@ -136,18 +135,19 @@ export const AssessmentTestsPanel = ({
         : 'Prueba psicotecnica inicial',
     description:
       type === 'TECHNICAL'
-        ? contextualProfessionalArea
-          ? `Evaluacion tecnica generada para ${contextualProfessionalArea} a partir de preguntas base del sistema.`
+        ? context?.professionalArea
+          ? `Evaluacion tecnica generada para ${context.professionalArea} a partir de preguntas base del sistema.`
           : 'Evaluacion tecnica general generada a partir de preguntas base del sistema.'
         : 'Evaluacion psicotecnica general generada a partir de preguntas base del sistema.',
     type,
     questionCount: questions.length,
     estimatedDurationMin: Math.max(10, Math.ceil(questions.length * 1.5)),
     questions,
-  }), [contextualProfessionalArea]);
+  }), []);
 
   const withFallbackTests = useCallback(async (
     tests: GeneratedTestsResponseDto,
+    context: GenerateTestsForProfileDto,
   ): Promise<GeneratedTestsResponseDto> => {
     const nextTests: GeneratedTestsResponseDto = {
       ...tests,
@@ -156,9 +156,9 @@ export const AssessmentTestsPanel = ({
     };
 
     if (activeTab === 'Tecnica' && nextTests.technicalTests.length === 0) {
-      const technicalQuestions = await getTechnicalTestQuestionsForContext(testsContext ?? undefined).catch(() => []);
+      const technicalQuestions = await getTechnicalTestQuestionsForContext(context).catch(() => []);
       if (technicalQuestions.length > 0) {
-        nextTests.technicalTests = [buildFallbackTest('TECHNICAL', technicalQuestions)];
+        nextTests.technicalTests = [buildFallbackTest('TECHNICAL', technicalQuestions, context)];
       }
     }
 
@@ -166,7 +166,7 @@ export const AssessmentTestsPanel = ({
       const psychotechnicalQuestions = await getPsychotechnicalTestQuestions().catch(() => []);
       if (psychotechnicalQuestions.length > 0) {
         nextTests.psychotechnicalTests = [
-          buildFallbackTest('PSYCHOTECHNICAL', psychotechnicalQuestions),
+          buildFallbackTest('PSYCHOTECHNICAL', psychotechnicalQuestions, context),
         ];
       }
     }
@@ -175,7 +175,7 @@ export const AssessmentTestsPanel = ({
       nextTests.technicalTests.length + nextTests.psychotechnicalTests.length;
 
     return nextTests;
-  }, [activeTab, buildFallbackTest, testsContext]);
+  }, [activeTab, buildFallbackTest]);
 
   const getTestsForTab = (testsResponse?: GeneratedTestsResponseDto | null): GeneratedTest[] => {
     const source = testsResponse ?? generatedTests;
@@ -191,7 +191,7 @@ export const AssessmentTestsPanel = ({
       const nextContext = await buildTestsContext();
       setTestsContext(nextContext);
       const tests = await generateTestsForProfile(nextContext);
-      const normalizedTests = await withFallbackTests(tests);
+      const normalizedTests = await withFallbackTests(tests, nextContext);
       setGeneratedTests(normalizedTests);
       return normalizedTests;
     } catch (error) {
@@ -447,6 +447,7 @@ export const AssessmentTestsPanel = ({
     : 'Iniciar prueba psicotecnica';
   const generatedTechnicalSkillsCount = generatedTests?.profile.technicalSkillsCount ?? 0;
   const generatedTotalTests = generatedTests?.totalTests ?? 0;
+  const contextualProfessionalArea = testsContext?.professionalArea;
   const contextualTechnicalSkills = testsContext?.technicalSkills ?? [];
 
   if (tests.length === 0) {
