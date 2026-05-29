@@ -17,13 +17,24 @@ import {
   consolidateMyAssessment,
   generateTestsForProfile,
   getPsychotechnicalTestQuestions,
-  getTechnicalTestQuestions,
+  getTechnicalTestQuestionsForContext,
   getMyAllTestResults,
   submitTechnicalTest,
   submitPsychotechnicalTest,
 } from '../services/assessment.service';
 import { generateMyLearningPath } from '../services/learning.service';
-import type { GeneratedTestsResponseDto, GeneratedTest, AssessmentTestResultEntity, AssessmentTestQuestion, AssessmentQuestionOption } from '../types/assessment.types';
+import { getMyProfile, getMyLatestCvDiagnostic } from '../services/profile.service';
+import { getMySkills } from '../services/skill.service';
+import type { CvDiagnostic, Profile } from '../types/profile.types';
+import type { UserSkill } from '../types/skill.types';
+import type {
+  GeneratedTestsResponseDto,
+  GeneratedTest,
+  AssessmentTestResultEntity,
+  AssessmentTestQuestion,
+  AssessmentQuestionOption,
+  GenerateTestsForProfileDto,
+} from '../types/assessment.types';
 
 interface AssessmentTestsPanelProps {
   activeTab: 'Tecnica' | 'Psicotecnica' | 'Resultados';
@@ -35,6 +46,7 @@ export const AssessmentTestsPanel = ({
   onTestCompleted,
 }: AssessmentTestsPanelProps) => {
   const [generatedTests, setGeneratedTests] = useState<GeneratedTestsResponseDto | null>(null);
+  const [testsContext, setTestsContext] = useState<GenerateTestsForProfileDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPreparingTest, setIsPreparingTest] = useState(false);
   const [currentTestId, setCurrentTestId] = useState<string | null>(null);
@@ -42,6 +54,76 @@ export const AssessmentTestsPanel = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [testsErrorMessage, setTestsErrorMessage] = useState<string | null>(null);
+
+  const formatInterestedRole = useCallback(
+    (role: string): string =>
+      role
+        .split('_')
+        .map((segment) => `${segment.slice(0, 1)}${segment.slice(1).toLowerCase()}`)
+        .join(' '),
+    [],
+  );
+
+  const extractProfessionalAreaFromDiagnostic = useCallback((
+    diagnostic: CvDiagnostic | null,
+  ): string | undefined => {
+    const snapshot = diagnostic?.snapshot as
+      | {
+          profile?: { title?: string };
+          experience?: Array<{ position?: string }>;
+        }
+      | undefined;
+
+    const profileTitle = snapshot?.profile?.title?.trim();
+    if (profileTitle) {
+      return profileTitle;
+    }
+
+    const firstExperienceTitle = snapshot?.experience?.[0]?.position?.trim();
+    return firstExperienceTitle || undefined;
+  }, []);
+
+  const buildTestsContext = useCallback(async (): Promise<GenerateTestsForProfileDto> => {
+    if (activeTab !== 'Tecnica') {
+      return {};
+    }
+
+    const [profile, skills, diagnostic] = await Promise.all([
+      getMyProfile().catch(() => null as Profile | null),
+      getMySkills().catch(() => [] as UserSkill[]),
+      getMyLatestCvDiagnostic().catch(() => null as CvDiagnostic | null),
+    ]);
+
+    const technicalSkillsFromProfile = skills
+      .filter((userSkill) => userSkill.skill?.category?.toUpperCase().includes('TECHNICAL'))
+      .map((userSkill) => userSkill.skill?.name?.trim() ?? '')
+      .filter((skillName) => skillName.length > 0);
+
+    const technicalSkills = Array.from(
+      new Set([
+        ...technicalSkillsFromProfile,
+        ...(diagnostic?.technicalSkills ?? []).map((skill) => skill.trim()).filter(Boolean),
+      ]),
+    ).slice(0, 8);
+
+    const interestedRoles = Array.isArray(profile?.interestedRoles)
+      ? profile.interestedRoles.map(formatInterestedRole)
+      : [];
+
+    const professionalArea =
+      profile?.headline?.trim() ||
+      extractProfessionalAreaFromDiagnostic(diagnostic) ||
+      interestedRoles[0];
+
+    return {
+      technicalSkills,
+      professionalArea,
+      headline: profile?.headline?.trim() || undefined,
+      interestedRoles,
+    };
+  }, [activeTab, extractProfessionalAreaFromDiagnostic, formatInterestedRole]);
+
+  const contextualProfessionalArea = testsContext?.professionalArea;
 
   const buildFallbackTest = useCallback((
     type: 'TECHNICAL' | 'PSYCHOTECHNICAL',
@@ -54,13 +136,15 @@ export const AssessmentTestsPanel = ({
         : 'Prueba psicotecnica inicial',
     description:
       type === 'TECHNICAL'
-        ? 'Evaluacion tecnica general generada a partir de preguntas base del sistema.'
+        ? contextualProfessionalArea
+          ? `Evaluacion tecnica generada para ${contextualProfessionalArea} a partir de preguntas base del sistema.`
+          : 'Evaluacion tecnica general generada a partir de preguntas base del sistema.'
         : 'Evaluacion psicotecnica general generada a partir de preguntas base del sistema.',
     type,
     questionCount: questions.length,
     estimatedDurationMin: Math.max(10, Math.ceil(questions.length * 1.5)),
     questions,
-  }), []);
+  }), [contextualProfessionalArea]);
 
   const withFallbackTests = useCallback(async (
     tests: GeneratedTestsResponseDto,
@@ -72,7 +156,7 @@ export const AssessmentTestsPanel = ({
     };
 
     if (activeTab === 'Tecnica' && nextTests.technicalTests.length === 0) {
-      const technicalQuestions = await getTechnicalTestQuestions().catch(() => []);
+      const technicalQuestions = await getTechnicalTestQuestionsForContext(testsContext ?? undefined).catch(() => []);
       if (technicalQuestions.length > 0) {
         nextTests.technicalTests = [buildFallbackTest('TECHNICAL', technicalQuestions)];
       }
@@ -91,7 +175,7 @@ export const AssessmentTestsPanel = ({
       nextTests.technicalTests.length + nextTests.psychotechnicalTests.length;
 
     return nextTests;
-  }, [activeTab, buildFallbackTest]);
+  }, [activeTab, buildFallbackTest, testsContext]);
 
   const getTestsForTab = (testsResponse?: GeneratedTestsResponseDto | null): GeneratedTest[] => {
     const source = testsResponse ?? generatedTests;
@@ -104,7 +188,9 @@ export const AssessmentTestsPanel = ({
   const loadGeneratedTests = useCallback(async (): Promise<GeneratedTestsResponseDto | null> => {
     try {
       setTestsErrorMessage(null);
-      const tests = await generateTestsForProfile();
+      const nextContext = await buildTestsContext();
+      setTestsContext(nextContext);
+      const tests = await generateTestsForProfile(nextContext);
       const normalizedTests = await withFallbackTests(tests);
       setGeneratedTests(normalizedTests);
       return normalizedTests;
@@ -116,7 +202,7 @@ export const AssessmentTestsPanel = ({
       setTestsErrorMessage(message);
       return null;
     }
-  }, [withFallbackTests]);
+  }, [buildTestsContext, withFallbackTests]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -145,7 +231,7 @@ export const AssessmentTestsPanel = ({
       if (availableTests.length === 0) {
         setTestsErrorMessage(
           activeTab === 'Tecnica'
-            ? 'No se pudo generar una prueba tecnica todavia. Verifica que tengas skills tecnicas guardadas.'
+            ? 'No se pudo generar una prueba tecnica todavia. Verifica que tengas skills tecnicas guardadas y un area profesional definida.'
             : 'No se pudo generar una prueba psicotecnica todavia. Intenta nuevamente en unos segundos.',
         );
         return;
@@ -361,6 +447,7 @@ export const AssessmentTestsPanel = ({
     : 'Iniciar prueba psicotecnica';
   const generatedTechnicalSkillsCount = generatedTests?.profile.technicalSkillsCount ?? 0;
   const generatedTotalTests = generatedTests?.totalTests ?? 0;
+  const contextualTechnicalSkills = testsContext?.technicalSkills ?? [];
 
   if (tests.length === 0) {
     return (
@@ -422,6 +509,24 @@ export const AssessmentTestsPanel = ({
           ? 'Evaluaciones tecnicas basadas en las skills de tu perfil. Cada prueba incluye preguntas sobre conceptos y practicas de cada skill.'
           : 'Evaluaciones psicotecnicas para medir aptitudes generales, razonamiento logico y habilidades blandas.'}
       </Typography>
+
+      {activeTab === 'Tecnica' && (contextualProfessionalArea || contextualTechnicalSkills.length > 0) && (
+        <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {contextualProfessionalArea && (
+            <Chip
+              label={`Area profesional: ${contextualProfessionalArea}`}
+              sx={{ bgcolor: '#E8F0FB', color: '#1D4678', fontWeight: 700 }}
+            />
+          )}
+          {contextualTechnicalSkills.slice(0, 5).map((skill) => (
+            <Chip
+              key={`technical-skill-${skill}`}
+              label={skill}
+              sx={{ bgcolor: '#F3E5F5', color: '#6A1B9A', fontWeight: 700 }}
+            />
+          ))}
+        </Box>
+      )}
 
       <Box sx={{ mt: 2.5, display: 'flex', flexWrap: 'wrap', gap: 1.2 }}>
         <Button
@@ -693,5 +798,3 @@ export const AssessmentResultsPanel = ({
     </Paper>
   );
 };
-
-
