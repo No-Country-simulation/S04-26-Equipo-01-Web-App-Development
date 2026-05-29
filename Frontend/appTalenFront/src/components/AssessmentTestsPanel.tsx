@@ -123,6 +123,8 @@ export const AssessmentTestsPanel = ({
     };
   }, [activeTab, extractProfessionalAreaFromDiagnostic, formatInterestedRole]);
 
+  const contextualProfessionalArea = testsContext?.professionalArea;
+
   const buildFallbackTest = useCallback((
     type: 'TECHNICAL' | 'PSYCHOTECHNICAL',
     questions: AssessmentTestQuestion[],
@@ -134,15 +136,15 @@ export const AssessmentTestsPanel = ({
         : 'Prueba psicotecnica inicial',
     description:
       type === 'TECHNICAL'
-        ? testsContext?.professionalArea
-          ? `Evaluacion tecnica generada para ${testsContext.professionalArea} a partir de preguntas base del sistema.`
+        ? contextualProfessionalArea
+          ? `Evaluacion tecnica generada para ${contextualProfessionalArea} a partir de preguntas base del sistema.`
           : 'Evaluacion tecnica general generada a partir de preguntas base del sistema.'
         : 'Evaluacion psicotecnica general generada a partir de preguntas base del sistema.',
     type,
     questionCount: questions.length,
     estimatedDurationMin: Math.max(10, Math.ceil(questions.length * 1.5)),
     questions,
-  }), [testsContext?.professionalArea]);
+  }), [contextualProfessionalArea]);
 
   const withFallbackTests = useCallback(async (
     tests: GeneratedTestsResponseDto,
@@ -446,7 +448,6 @@ export const AssessmentTestsPanel = ({
   const generatedTechnicalSkillsCount = generatedTests?.profile.technicalSkillsCount ?? 0;
   const generatedTotalTests = generatedTests?.totalTests ?? 0;
   const contextualTechnicalSkills = testsContext?.technicalSkills ?? [];
-  const contextualProfessionalArea = testsContext?.professionalArea ?? null;
 
   if (tests.length === 0) {
     return (
@@ -797,5 +798,3 @@ export const AssessmentResultsPanel = ({
     </Paper>
   );
 };
-
-

@@ -43,7 +43,7 @@ const expandKeywords = (values: Array<string | undefined>): string[] => {
   const rawKeywords = uniqueStrings(values);
   const fragments = rawKeywords.flatMap((value) =>
     value
-      .split(/[\/|,()\-]/)
+      .split(/[/|,()-]/)
       .flatMap((part) => part.split(/\s+/))
       .map((part) => part.trim())
       .filter((part) => part.length >= 3),
@@ -459,4 +459,3 @@ export const consolidateMyAssessment = async (): Promise<Assessment> => {
     return throwBackendError(error);
   }
 };
-

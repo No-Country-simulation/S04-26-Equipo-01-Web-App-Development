@@ -67,17 +67,18 @@ const getStoredAuthUserId = (): string => {
 export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPanelProps) => {
   const [learningPaths, setLearningPaths] = useState<LearningPath[]>([]);
   const [publishedCourses, setPublishedCourses] = useState<Course[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [selectionHydrated, setSelectionHydrated] = useState(false);
+  const selectedCourseStorageKey = useMemo(
+    () => `${SELECTED_COURSE_STORAGE_PREFIX}-${getStoredAuthUserId()}`,
+    [],
+  );
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() =>
+    localStorage.getItem(selectedCourseStorageKey),
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
   const [updatingModuleId, setUpdatingModuleId] = useState<string | null>(null);
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const selectedCourseStorageKey = useMemo(
-    () => `${SELECTED_COURSE_STORAGE_PREFIX}-${getStoredAuthUserId()}`,
-    [],
-  );
 
   const fetchLearningPaths = async (): Promise<LearningPath[]> => {
     try {
@@ -126,44 +127,24 @@ export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPane
     };
   }, [refreshToken]);
 
-  useEffect(() => {
-    if (!publishedCourses.length) {
-      setSelectedCourseId(null);
-      return;
+  const validSelectedCourseId = useMemo(() => {
+    if (!selectedCourseId) {
+      return null;
     }
 
-    if (!selectionHydrated) {
-      const storedCourseId = localStorage.getItem(selectedCourseStorageKey);
-      if (
-        storedCourseId &&
-        publishedCourses.some((course) => course.id === storedCourseId)
-      ) {
-        setSelectedCourseId(storedCourseId);
-      }
-      setSelectionHydrated(true);
-      return;
-    }
-
-    if (
-      selectedCourseId &&
-      !publishedCourses.some((course) => course.id === selectedCourseId)
-    ) {
-      setSelectedCourseId(null);
-    }
-  }, [publishedCourses, selectedCourseId, selectedCourseStorageKey, selectionHydrated]);
+    return publishedCourses.some((course) => course.id === selectedCourseId)
+      ? selectedCourseId
+      : null;
+  }, [publishedCourses, selectedCourseId]);
 
   useEffect(() => {
-    if (!selectionHydrated) {
-      return;
-    }
-
-    if (selectedCourseId) {
-      localStorage.setItem(selectedCourseStorageKey, selectedCourseId);
+    if (validSelectedCourseId) {
+      localStorage.setItem(selectedCourseStorageKey, validSelectedCourseId);
       return;
     }
 
     localStorage.removeItem(selectedCourseStorageKey);
-  }, [selectedCourseId, selectedCourseStorageKey, selectionHydrated]);
+  }, [selectedCourseStorageKey, validSelectedCourseId]);
 
   const handleGenerateRoadmap = async (selectedCourse?: Course) => {
     try {
@@ -435,8 +416,8 @@ export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPane
                     p: 1.5,
                     borderRadius: 2,
                     border: '1px solid',
-                    borderColor: selectedCourseId === course.id ? '#1F3E69' : '#D8E3F0',
-                    bgcolor: selectedCourseId === course.id ? '#EAF2FF' : '#F8FBFF',
+                    borderColor: validSelectedCourseId === course.id ? '#1F3E69' : '#D8E3F0',
+                    bgcolor: validSelectedCourseId === course.id ? '#EAF2FF' : '#F8FBFF',
                   }}
                 >
                   <Box sx={{ minWidth: 0 }}>
@@ -444,7 +425,7 @@ export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPane
                       <Typography sx={{ fontWeight: 800, color: '#173A68' }}>
                         {course.title}
                       </Typography>
-                      {selectedCourseId === course.id && (
+                      {validSelectedCourseId === course.id && (
                         <Chip size="small" label="Seleccionado" sx={{ bgcolor: '#1F3E69', color: '#fff', fontWeight: 700 }} />
                       )}
                     </Box>
@@ -467,11 +448,11 @@ export const LearningRoadmapPanel = ({ mode, refreshToken }: LearningRoadmapPane
                       textTransform: 'none',
                       minWidth: 170,
                       alignSelf: 'center',
-                      borderColor: selectedCourseId === course.id ? '#1F3E69' : undefined,
-                      color: selectedCourseId === course.id ? '#1F3E69' : undefined,
+                      borderColor: validSelectedCourseId === course.id ? '#1F3E69' : undefined,
+                      color: validSelectedCourseId === course.id ? '#1F3E69' : undefined,
                     }}
                   >
-                    {selectedCourseId === course.id ? 'Curso activo' : 'Iniciar con este curso'}
+                    {validSelectedCourseId === course.id ? 'Curso activo' : 'Iniciar con este curso'}
                   </Button>
                 </Box>
               ))}
